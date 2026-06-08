@@ -1,0 +1,69 @@
+# Catalog of canonical defect IDs the agents can tag concerns with.
+# Larger than the set seeded in any single scenario, so passing it to the
+# agent provides vocabulary, not answers. Grow this as you add scenarios.
+
+# --- Security and privacy ---
+- id: def_pii_in_logs
+  description: "PII written to logs without redaction"
+- id: def_no_log_retention
+  description: "Log group has no defined retention policy"
+- id: def_gdpr_residency
+  description: "EU data stored or replicated outside EU without residency controls"
+- id: def_no_transfer_mechanism
+  description: "Cross-border data transfer lacks documented legal mechanism (SCCs, etc.)"
+- id: def_secrets_in_code
+  description: "API keys or credentials committed to source or config"
+- id: def_no_encryption_at_rest
+  description: "Sensitive data store missing encryption at rest"
+- id: def_overbroad_iam
+  description: "IAM role grants broader permissions than required"
+- id: def_no_audit_logging
+  description: "Security-sensitive actions not audit-logged"
+- id: def_missing_pci_scope_review
+  description: "Service handles card data without PCI scope assessment"
+
+# --- Architecture and reliability ---
+- id: def_no_timeout
+  description: "Synchronous call has no timeout configured"
+- id: def_no_circuit_breaker
+  description: "Critical-path dependency lacks circuit breaker or fallback"
+- id: def_sla_math_broken
+  description: "Composite SLA target unachievable given dependency SLAs"
+- id: def_circular_dependency
+  description: "Mutual hard dependencies between services for same release"
+- id: def_no_sequencing_plan
+  description: "Dependency cycle has no contract-first or sequencing plan"
+- id: def_no_rollback_plan
+  description: "Release lacks documented rollback procedure"
+- id: def_no_idempotency
+  description: "Mutating endpoint lacks idempotency guarantees"
+- id: def_no_backpressure
+  description: "High-throughput consumer has no backpressure or queue limits"
+- id: def_single_point_of_failure
+  description: "Critical-path component has no redundancy"
+
+# --- Scope and product ---
+- id: def_unmeasurable_acceptance_criteria
+  description: "Acceptance criteria lack numeric thresholds or testable definitions"
+- id: def_scope_too_broad
+  description: "Release bundles multiple feature areas into one gate"
+- id: def_unchanged_acceptance_criteria
+  description: "Scope changed but acceptance criteria not updated"
+- id: def_no_dependency_impact
+  description: "New scope item introduces undocumented dependencies"
+- id: def_no_timeline_revision
+  description: "Scope added without revising timeline or staffing"
+- id: def_missing_success_metric
+  description: "Project has no measurable success metric"
+
+# --- FinOps and legal ---
+- id: def_no_cost_ceiling
+  description: "Autoscaling or compute has no maximum cap"
+- id: def_missing_cost_estimate
+  description: "Required cost estimate marked TBD at the gate"
+- id: def_missing_vendor_sla
+  description: "Third-party vendor used without SLA terms"
+- id: def_license_incompatible
+  description: "Dependency license incompatible with intended use"
+- id: def_no_egress_cost_model
+  description: "Cross-region data flow without egress cost model"

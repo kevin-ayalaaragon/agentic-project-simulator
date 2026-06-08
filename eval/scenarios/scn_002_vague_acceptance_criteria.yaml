@@ -1,0 +1,25 @@
+id: scn_002_vague_acceptance_criteria
+category: scope_creep
+description: >
+  A "checkout improvements" initiative submitted for design review. The
+  scope document lists six feature areas but acceptance criteria are
+  written in marketing language with no measurable thresholds.
+project_state:
+  name: "Checkout Improvements Q1"
+  stage: "design_gate"
+  artifacts:
+    - "prd_v2"
+  acceptance_criteria:
+    - "Customers love the new checkout"
+    - "Conversion improves significantly"
+    - "Page feels fast"
+seeded_defects:
+  - id: def_unmeasurable_acceptance_criteria
+    description: "Acceptance criteria have no numeric thresholds or definitions"
+    should_be_caught_by: "pm_agent"
+    at_gate: "design_gate"
+  - id: def_scope_too_broad
+    description: "Six feature areas bundled into one gate review"
+    should_be_caught_by: "pm_agent"
+    at_gate: "design_gate"
+expected_gate_outcome: "blocked"

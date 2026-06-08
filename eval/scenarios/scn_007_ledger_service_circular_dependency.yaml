@@ -1,0 +1,27 @@
+id: scn_007_ledger_service_circular_dependency
+category: architecture
+description: >
+  New ledger service depends on the fraud service for transaction
+  enrichment. Fraud service is being refactored in parallel to depend
+  on the new ledger service for historical lookups. Both teams have
+  the other team as a hard dependency for their Q2 release.
+project_state:
+  name: "Unified Ledger Service"
+  stage: "architecture_review_gate"
+  artifacts:
+    - "system_architecture_v2.1"
+    - "fraud_service_refactor_doc"
+    - "q2_release_plan"
+  acceptance_criteria:
+    - "Ledger queries return in under 100ms"
+    - "Transactions enriched with fraud signal before settlement"
+seeded_defects:
+  - id: def_circular_dependency
+    description: "Ledger and fraud services have mutual hard dependencies for same release"
+    should_be_caught_by: "engineering_lead_agent"
+    at_gate: "architecture_review_gate"
+  - id: def_no_sequencing_plan
+    description: "No defined sequencing or contract-first approach to break the cycle"
+    should_be_caught_by: "pm_agent"
+    at_gate: "architecture_review_gate"
+expected_gate_outcome: "blocked"

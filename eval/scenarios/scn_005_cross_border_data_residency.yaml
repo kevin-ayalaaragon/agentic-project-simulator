@@ -1,0 +1,25 @@
+id: scn_005_cross_border_data_residency
+category: security_privacy
+description: >
+  Customer profile service proposes replicating EU customer data to a
+  US-East primary for "latency reasons." Design doc mentions GDPR once,
+  in passing, and does not address data residency or transfer mechanism.
+project_state:
+  name: "Global Customer Profile Service"
+  stage: "design_gate"
+  artifacts:
+    - "design_doc_v2"
+    - "replication_topology"
+  acceptance_criteria:
+    - "Profile reads under 50ms globally"
+    - "Strong consistency on writes"
+seeded_defects:
+  - id: def_gdpr_residency
+    description: "EU customer data replicated to US without residency controls or SCCs"
+    should_be_caught_by: "security_privacy_agent"
+    at_gate: "design_gate"
+  - id: def_no_transfer_mechanism
+    description: "No documented legal transfer mechanism for EU-to-US data flow"
+    should_be_caught_by: "finops_legal_agent"
+    at_gate: "design_gate"
+expected_gate_outcome: "blocked"

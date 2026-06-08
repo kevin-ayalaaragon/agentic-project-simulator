@@ -1,0 +1,20 @@
+id: scn_009_clean_observability_dashboard
+category: clean
+description: >
+  Adding an observability dashboard for the existing settlement
+  pipeline. Read-only consumer of existing metrics, no new data
+  collection, no PII exposure, cost is fixed at the dashboard tool's
+  per-seat license. Clear acceptance criteria.
+project_state:
+  name: "Settlement Pipeline Observability Dashboard"
+  stage: "design_gate"
+  artifacts:
+    - "design_doc_v1"
+    - "metrics_inventory"
+    - "license_quote"
+  acceptance_criteria:
+    - "Dashboard renders within 3 seconds"
+    - "Covers 100% of pipeline stages currently emitting metrics"
+    - "Accessible to ops team with existing SSO"
+seeded_defects: []
+expected_gate_outcome: "approved"

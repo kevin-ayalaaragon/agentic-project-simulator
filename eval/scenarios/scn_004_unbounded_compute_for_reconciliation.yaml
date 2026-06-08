@@ -1,0 +1,26 @@
+id: scn_004_unbounded_compute_for_reconciliation
+category: finops_resource
+description: >
+  A nightly reconciliation job is proposed to run on an autoscaling
+  cluster with no maximum node cap. Cost model in the design doc is
+  marked "TBD". Job historically processes 40M to 200M records depending
+  on the day.
+project_state:
+  name: "Daily Settlement Reconciliation v2"
+  stage: "architecture_review_gate"
+  artifacts:
+    - "design_doc_v3"
+    - "cost_estimate_TBD"
+  acceptance_criteria:
+    - "Reconciliation completes by 6am ET"
+    - "100% record coverage"
+seeded_defects:
+  - id: def_no_cost_ceiling
+    description: "Autoscaling has no max nodes; unbounded cost exposure on high-volume days"
+    should_be_caught_by: "finops_legal_agent"
+    at_gate: "architecture_review_gate"
+  - id: def_missing_cost_estimate
+    description: "Cost estimate left as TBD at architecture gate"
+    should_be_caught_by: "finops_legal_agent"
+    at_gate: "architecture_review_gate"
+expected_gate_outcome: "blocked"

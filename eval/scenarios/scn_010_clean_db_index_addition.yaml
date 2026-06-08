@@ -1,0 +1,20 @@
+id: scn_010_clean_db_index_addition
+category: clean
+description: >
+  Adding two composite indexes to the transactions table to support
+  a known slow query pattern. Index size estimated, rollout via
+  online schema change tool, rollback plan documented, no API
+  changes, no security implications.
+project_state:
+  name: "Transaction Table Index Optimization"
+  stage: "design_gate"
+  artifacts:
+    - "design_doc_v1"
+    - "query_performance_analysis"
+    - "rollback_plan"
+  acceptance_criteria:
+    - "Target query p99 drops from 800ms to under 100ms"
+    - "Index build completes with zero downtime"
+    - "Storage overhead under 8% of table size"
+seeded_defects: []
+expected_gate_outcome: "approved"

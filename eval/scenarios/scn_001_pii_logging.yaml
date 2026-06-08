@@ -1,0 +1,25 @@
+id: scn_001_pii_logging
+category: security_privacy
+description: >
+  A new fraud-detection service logs full card numbers and customer names
+  to CloudWatch for debugging. No redaction layer, no retention policy on
+  the log group, and the design doc doesn't mention PII handling.
+project_state:
+  name: "RealTime Fraud Scoring v1"
+  stage: "design_gate"
+  artifacts:
+    - "design_doc_v1"
+    - "data_flow_diagram"
+  acceptance_criteria:
+    - "Fraud score returned in under 200ms"
+    - "Service handles 5000 RPS sustained"
+seeded_defects:
+  - id: def_pii_in_logs
+    description: "Full PAN and customer names written to logs"
+    should_be_caught_by: "security_privacy_agent"
+    at_gate: "design_gate"
+  - id: def_no_log_retention
+    description: "No retention policy defined for the log group"
+    should_be_caught_by: "security_privacy_agent"
+    at_gate: "design_gate"
+expected_gate_outcome: "blocked"

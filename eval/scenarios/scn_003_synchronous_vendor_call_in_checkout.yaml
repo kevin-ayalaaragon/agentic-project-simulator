@@ -1,0 +1,29 @@
+id: scn_003_synchronous_vendor_call_in_checkout
+category: architecture
+description: >
+  Checkout service makes a synchronous, blocking call to a third-party
+  AML screening vendor on the critical path. No timeout, no circuit
+  breaker, no async fallback. Vendor SLA is 99.5%.
+project_state:
+  name: "AML Screening Integration"
+  stage: "architecture_review_gate"
+  artifacts:
+    - "system_architecture_v1.0"
+    - "sequence_diagram"
+  acceptance_criteria:
+    - "Checkout p99 latency under 1.5s"
+    - "AML screening completes before order confirmation"
+seeded_defects:
+  - id: def_no_timeout
+    description: "Sync vendor call has no timeout configured"
+    should_be_caught_by: "engineering_lead_agent"
+    at_gate: "architecture_review_gate"
+  - id: def_no_circuit_breaker
+    description: "No circuit breaker or fallback for vendor outage"
+    should_be_caught_by: "engineering_lead_agent"
+    at_gate: "architecture_review_gate"
+  - id: def_sla_math_broken
+    description: "Vendor 99.5% SLA cannot support checkout 99.9% target without async pattern"
+    should_be_caught_by: "engineering_lead_agent"
+    at_gate: "architecture_review_gate"
+expected_gate_outcome: "blocked"

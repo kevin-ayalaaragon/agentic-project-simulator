@@ -1,0 +1,31 @@
+id: scn_006_mid_sprint_scope_addition
+category: scope_creep
+description: >
+  Halfway through a six-week build of a new payouts API, leadership
+  requests adding "instant payouts via debit rails" to the same release.
+  No revised timeline, no dependency analysis, and the original
+  acceptance criteria are unchanged.
+project_state:
+  name: "Payouts API v1"
+  stage: "build_gate"
+  artifacts:
+    - "prd_v1"
+    - "sprint_plan_week3"
+    - "leadership_change_request"
+  acceptance_criteria:
+    - "ACH payouts complete within 1 business day"
+    - "API supports 500 RPS"
+seeded_defects:
+  - id: def_unchanged_acceptance_criteria
+    description: "Acceptance criteria not updated to include instant payouts"
+    should_be_caught_by: "pm_agent"
+    at_gate: "build_gate"
+  - id: def_no_dependency_impact
+    description: "Debit rail integration requires new vendor and KYC flow, not analyzed"
+    should_be_caught_by: "engineering_lead_agent"
+    at_gate: "build_gate"
+  - id: def_no_timeline_revision
+    description: "Scope added without revising release timeline or staffing"
+    should_be_caught_by: "pm_agent"
+    at_gate: "build_gate"
+expected_gate_outcome: "blocked"

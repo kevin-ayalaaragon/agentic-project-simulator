@@ -1,0 +1,20 @@
+id: scn_008_clean_idempotency_key_rollout
+category: clean
+description: >
+  Well-scoped rollout of idempotency keys to the refunds endpoint.
+  Acceptance criteria measurable, security review attached, cost
+  impact negligible, no new vendor dependencies, dependency on
+  existing key store already shipped.
+project_state:
+  name: "Idempotency Keys for Refunds API"
+  stage: "design_gate"
+  artifacts:
+    - "design_doc_v2"
+    - "security_review_signoff"
+    - "cost_estimate"
+  acceptance_criteria:
+    - "Duplicate refund requests within 24h window return original response"
+    - "p99 latency impact under 5ms"
+    - "Zero increase in error rate during rollout"
+seeded_defects: []
+expected_gate_outcome: "approved"
