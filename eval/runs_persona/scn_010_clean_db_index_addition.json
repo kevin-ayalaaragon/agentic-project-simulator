@@ -1,0 +1,208 @@
+{
+  "scenario_id": "scn_010_clean_db_index_addition",
+  "judge_model": "claude-opus-4-8",
+  "cost_usd": 0.336795,
+  "schema_failures": 0,
+  "verdicts": [
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "pm_agent",
+      "concern_index": 0,
+      "concern_text": "No cost estimate is present in the artifacts for storage overhead or index build compute costs. The acceptance criterion caps storage at 8% of table size, but there is no dollar figure attached to that overhead or to any compute costs for the build process. This must be documented before production deployment.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "finops_legal_agent",
+      "justification": "The concern is fundamentally about dollar cost estimates for storage and compute, which is FinOps territory, not PM measurability or scoping.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "pm_agent",
+      "concern_index": 1,
+      "concern_text": "The acceptance criteria do not specify how or when p99 will be measured post-deployment (e.g., measurement window, traffic volume, specific query set). Without a defined measurement protocol, it will be ambiguous whether the 100ms target has been met. Add a testable measurement plan to the success criteria.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Concern targets measurable, testable acceptance criteria and how project success is evaluated\u2014core PM lane. Focus is on measurement protocol clarity, not implementation details.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "pm_agent",
+      "concern_index": 2,
+      "concern_text": "The zero-downtime index build criterion lacks a definition of 'downtime.' Clarify whether this means zero replication lag spikes, zero query errors, zero degradation above a threshold, or something else. This is needed to make the criterion unambiguously testable at release.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Concern is about making an acceptance criterion unambiguously testable, which is squarely PM lifecycle-gate scope, not implementation detail.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "pm_agent",
+      "concern_index": 3,
+      "concern_text": "The rollback plan artifact is listed but no summary of its trigger conditions or RTO target is visible in the project state. Confirm the rollback plan specifies who authorizes rollback, under what observable conditions, and the expected recovery time.",
+      "verdict": "partial",
+      "encroaches_on": "engineering_lead_agent",
+      "justification": "Asking for a documented, evaluable rollback plan with clear conditions is within PM's success-evaluation lane, but specifying authorization, observable triggers, and RTO targets reaches into engineering/operational readiness detail.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "engineering_lead_agent",
+      "concern_index": 0,
+      "concern_text": "A rollback_plan artifact is listed but the design doc must explicitly reference it and confirm the rollback procedure has been tested or dry-run. Presence of the artifact alone does not confirm operational readiness.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Rollback readiness and operational maturity fall squarely within the engineering lead's reliability and operational domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "engineering_lead_agent",
+      "concern_index": 1,
+      "concern_text": "The acceptance criterion 'index build completes with zero downtime' is not backed by a documented mechanism (e.g., CONCURRENTLY build on Postgres, online DDL on MySQL, shadow index strategy). The design doc must specify the exact DDL strategy and how it was validated to be non-blocking under production load levels.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Zero-downtime index build mechanism (concurrent DDL, shadow index) is a reliability/operational maturity and data flow concern squarely in the engineering lead's domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "engineering_lead_agent",
+      "concern_index": 2,
+      "concern_text": "The 8% storage overhead criterion lacks a baseline table size and measurement methodology. Without a stated baseline (e.g., current table size in GB) and a defined measurement point (post-build, steady-state), this criterion cannot be objectively verified at release.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Measurement methodology and verifiability of a storage/reliability criterion fall within operational maturity and data-flow correctness, squarely engineering lead scope.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "engineering_lead_agent",
+      "concern_index": 3,
+      "concern_text": "The query_performance_analysis should confirm that the p99 target of sub-100ms was validated against production-representative data distribution and cardinality, not just synthetic test data. Index selectivity assumptions must be documented.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Performance validation, p99 targets, index selectivity, and data distribution are core reliability and architectural soundness concerns for an engineering lead.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "engineering_lead_agent",
+      "concern_index": 4,
+      "concern_text": "No mention of index maintenance overhead during high write throughput periods. The design should address write amplification impact and whether index creation or ongoing maintenance could cause lock contention or replication lag.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Write amplification, lock contention, and replication lag are reliability and data-flow performance concerns squarely within engineering lead scope.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "engineering_lead_agent",
+      "concern_index": 5,
+      "concern_text": "If the transaction table contains financial or sensitive records, any schema change operation (DDL) should be captured in an audit log. Confirm DDL audit logging is enabled for the target database.",
+      "verdict": "partial",
+      "encroaches_on": "security_privacy_agent",
+      "justification": "Audit logging of DDL is an operational maturity concern (in domain), but framing it around 'financial or sensitive records' and audit trails leans into security/privacy compliance territory.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "security_privacy_agent",
+      "concern_index": 0,
+      "concern_text": "The design document does not mention audit logging for DDL operations (index creation/drops) on the transaction table. Schema changes on tables containing financial transaction data are security-sensitive and must be captured in an immutable audit log with actor, timestamp, and operation details.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Audit logging of schema changes on financial data is squarely within the security/privacy reviewer's stated domain of audit logging and regulatory exposure.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "security_privacy_agent",
+      "concern_index": 1,
+      "concern_text": "The query performance analysis artifact likely captures slow-query logs or EXPLAIN ANALYZE output. If the transaction table contains cardholder names, account numbers, or other PII, raw query samples or row data must be redacted before being written to any log store. No redaction controls are described in the design.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PII in log stores and redaction controls are core to PII handling and audit logging in the security/privacy domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "security_privacy_agent",
+      "concern_index": 2,
+      "concern_text": "The project targets a 'transaction table' but contains no mention of a PCI-DSS scope assessment. If this table stores or references card data (PANs, CVVs, expiry dates), the index build process, any temporary sort files, and index storage must all be evaluated for PCI scope. Missing this assessment is a blocking gap.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PCI-DSS scope assessment and card data handling are core to the security/privacy regulatory exposure domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "security_privacy_agent",
+      "concern_index": 3,
+      "concern_text": "New indexes on a transaction table may use temporary disk space and secondary index storage. The design does not confirm that both the index structures and any temporary build artifacts inherit or explicitly enable encryption at rest, especially for interim sort/merge files created during concurrent index builds.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Encryption at rest for index structures and temporary build artifacts is squarely within security/privacy domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "security_privacy_agent",
+      "concern_index": 4,
+      "concern_text": "No IAM or database role controls are described for who can execute the index DDL. The migration or automation account should hold only the minimum privilege needed (e.g., CREATE INDEX on the specific table) and not broader DBA or table-owner rights. Principle of least privilege must be documented.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Access control and least-privilege IAM/database roles for executing DDL fall squarely within the security reviewer's domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "security_privacy_agent",
+      "concern_index": 5,
+      "concern_text": "Performance analysis and DDL execution logs generated during the index build have no described retention policy. For regulatory environments (GDPR, PCI-DSS), log retention windows must be explicitly defined and enforced to avoid both over-retention of personal data and under-retention of compliance evidence.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Log retention, audit logging, and GDPR/PCI-DSS regulatory exposure are explicitly within the security/privacy reviewer's stated domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "security_privacy_agent",
+      "concern_index": 6,
+      "concern_text": "If the transaction table contains EU data subjects' personal data, the design must confirm that index build operations, temporary tablespaces, and any read replicas used during performance testing do not replicate data outside the EU without documented residency controls.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Concern is about data residency of PII across replicas/tablespaces, squarely within security/privacy domain (GDPR, data residency).",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "finops_legal_agent",
+      "concern_index": 0,
+      "concern_text": "The design doc does not specify a cost ceiling for index build compute resources. If the index build triggers autoscaling or consumes burst compute capacity, there is no documented maximum spend cap to prevent runaway costs during the build operation.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Cost ceilings and unbounded resource exposure are core FinOps concerns; the missing spend cap on compute is squarely in scope.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "finops_legal_agent",
+      "concern_index": 1,
+      "concern_text": "No cost estimate is provided for the additional storage overhead (up to 8% of table size) or the index build I/O costs. At scale, persistent storage additions and I/O spikes during build can carry meaningful monthly cost implications that must be quantified before approval.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Concern is about quantifying storage and I/O cost implications, squarely within cost ceilings and unit economics scope.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_010_clean_db_index_addition",
+      "agent": "finops_legal_agent",
+      "concern_index": 2,
+      "concern_text": "If the transaction table is replicated across regions or the index build triggers cross-region replication sync, there is no egress cost model documented. This should be confirmed as in-region only or an egress estimate provided.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Cross-region egress cost modeling and unbounded resource exposure fall squarely within FinOps cost ceilings and unit economics domain.",
+      "matched_seeded_defect": false
+    }
+  ]
+}

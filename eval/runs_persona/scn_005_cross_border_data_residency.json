@@ -1,0 +1,348 @@
+{
+  "scenario_id": "scn_005_cross_border_data_residency",
+  "judge_model": "claude-opus-4-8",
+  "cost_usd": 0.57633,
+  "schema_failures": 0,
+  "verdicts": [
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "pm_agent",
+      "concern_index": 0,
+      "concern_text": "Acceptance criteria state 'Profile reads under 50ms globally' but do not specify percentile (p50, p95, p99), measurement location (client-side vs. server-side), or what 'globally' means in terms of tested regions. This cannot be objectively pass/failed at any test gate.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Critiquing acceptance criteria for measurability and objective pass/fail testability is squarely PM domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "pm_agent",
+      "concern_index": 1,
+      "concern_text": "'Strong consistency on writes' is not a measurable acceptance criterion. It must specify the consistency model (e.g., linearizability, read-your-writes), the scope (single region vs. global), and how it will be verified in testing.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PM is flagging that an acceptance criterion is not measurable/verifiable, which is squarely their domain. Naming consistency models is illustrative, not a technical prescription of implementation.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "pm_agent",
+      "concern_index": 2,
+      "concern_text": "There are no business-level success metrics defined \u2014 e.g., reduction in profile lookup errors, downstream service adoption rate, or customer-impacting incident reduction. Acceptance criteria cover technical thresholds only; we cannot evaluate whether this project delivered business value.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Concern is about missing measurable business-level success metrics and inability to evaluate delivered value, which is squarely PM domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "pm_agent",
+      "concern_index": 3,
+      "concern_text": "The replication_topology artifact implies cross-region data replication for global reads, but there is no documented egress cost model. At scale, cross-region replication costs can be substantial and must be estimated before design approval.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "finops_legal_agent",
+      "justification": "The concern is fundamentally about estimating cross-region egress/replication cost modeling, which is a FinOps domain matter, not measurable acceptance criteria or timeline scoping.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "pm_agent",
+      "concern_index": 4,
+      "concern_text": "No cost estimate is present in the design artifacts for compute, storage, or replication infrastructure required to achieve sub-50ms global reads. A design gate should include at least an order-of-magnitude cost estimate.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "finops_legal_agent",
+      "justification": "Cost estimates for infrastructure fall squarely in FinOps domain, not PM's scope of acceptance criteria and timeline.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "pm_agent",
+      "concern_index": 5,
+      "concern_text": "This is a Global Customer Profile Service with a replication topology spanning regions. There is no documented residency control for EU customer data. Given GDPR requirements, the design must explicitly address where EU profiles are stored and whether replication crosses EU boundaries.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "security_privacy_agent",
+      "justification": "GDPR data residency and cross-border replication compliance is a privacy/security domain concern, explicitly outside the PM's stated lane.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "pm_agent",
+      "concern_index": 6,
+      "concern_text": "A 50ms global read SLA requires all upstream and infrastructure dependencies (DNS, load balancers, data stores, network) to be accounted for in a latency budget. No latency budget breakdown is visible in the artifacts. Without this, the target may be unachievable and won't be caught until load testing.",
+      "verdict": "partial",
+      "encroaches_on": "engineering_lead_agent",
+      "justification": "The dependency/timeline concern is PM-relevant, but the specific latency-budget breakdown across DNS, load balancers, data stores, and network is an engineering architecture assessment.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "pm_agent",
+      "concern_index": 7,
+      "concern_text": "No rollback procedure is documented for this service. Given that it is a global profile service with replication state, rollback is non-trivial and must be designed explicitly before the build gate.",
+      "verdict": "partial",
+      "encroaches_on": "engineering_lead_agent",
+      "justification": "Rollback procedure design for a service with replication state is an engineering/operational concern, though PM can flag it as a dependency/readiness gap. Framing leans technical.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 0,
+      "concern_text": "Design doc v2 does not specify timeout configurations for synchronous calls between profile service and its dependencies. Without explicit timeouts, latency spikes in downstream services can cascade and violate the 50ms global read SLA.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Timeout configuration and cascading latency failures are core reliability patterns squarely within engineering lead domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 1,
+      "concern_text": "No circuit breaker or fallback strategy is documented for critical-path dependencies. A failure in a downstream service (e.g., identity or entitlement service) will propagate fully to profile reads globally.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Circuit breakers, fallback strategy, and failure propagation on critical-path dependencies are core reliability patterns explicitly within the engineering lead's domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 2,
+      "concern_text": "The acceptance criterion of sub-50ms global reads combined with strong consistency on writes is likely unachievable given speed-of-light constraints and typical consensus round-trips across global regions. No dependency SLA analysis or latency budget is documented.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Architectural feasibility, consistency-vs-latency tradeoffs, and missing latency budget/dependency SLA analysis are core engineering reliability and data-flow concerns.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 3,
+      "concern_text": "The replication topology shows global data distribution but there are no documented residency controls to prevent EU customer profile data from being replicated outside the EU. This is a potential GDPR violation.",
+      "verdict": "partial",
+      "encroaches_on": "security_privacy_agent",
+      "justification": "Replication topology and data flow are in the eng lead's domain, but the concern is framed primarily as a GDPR residency/compliance violation, which belongs to security/privacy.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 4,
+      "concern_text": "Cross-border replication of customer profile data is described in the topology but no legal transfer mechanism (SCCs, adequacy decisions, BCRs) is documented for data flowing across jurisdictions.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "security_privacy_agent",
+      "justification": "Legal transfer mechanisms (SCCs, adequacy, BCRs) for cross-border data are a privacy/compliance concern, not architecture or reliability. Reviewer explicitly does not own legal scope.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 5,
+      "concern_text": "Strong consistency on writes is an acceptance criterion but no idempotency guarantees are specified for mutating profile endpoints. Retries under failure can result in duplicate writes or data corruption.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Idempotency, retry safety, and data correctness for mutating endpoints are core reliability and data-flow concerns squarely within the engineering lead's domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 6,
+      "concern_text": "No rollback procedure is documented for the global profile service. Given the distributed replication topology, a failed deployment could leave profile data in an inconsistent state across regions without a defined recovery path.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Rollback procedures, deployment recovery, and data consistency across replication topology are core reliability and operational maturity concerns.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 7,
+      "concern_text": "The replication topology implies significant cross-region data flow for a global service, but no egress cost model is provided. At scale, inter-region replication costs can be substantial and must be estimated before approval.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "finops_legal_agent",
+      "justification": "The concern is framed primarily around egress cost modeling and financial estimation, which falls in finance scope, not the reliability/architecture domain the lead owns.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 8,
+      "concern_text": "Profile data is PII-sensitive. The design does not document audit logging for security-sensitive actions such as reads of full profiles, writes, and administrative access to customer data.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "security_privacy_agent",
+      "justification": "PII sensitivity and audit logging for security-sensitive access is a security/privacy concern, not architectural or reliability scope owned by the engineering lead.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "engineering_lead_agent",
+      "concern_index": 9,
+      "concern_text": "The replication topology does not clearly document redundancy for coordination components (e.g., consensus leaders, write coordinators). Loss of a single coordinator could make strong consistency writes unavailable globally.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Replication topology, redundancy, and consistency availability under coordinator failure are core reliability and architectural soundness concerns.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "security_privacy_agent",
+      "concern_index": 0,
+      "concern_text": "The replication_topology artifact implies global replication, but there is no documented EU data residency control. EU customer profile data (which constitutes personal data under GDPR) must not be replicated outside the EU without explicit residency controls or a compliant legal mechanism in place.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Data residency and GDPR exposure for PII are explicitly within the security/privacy reviewer's domain.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "security_privacy_agent",
+      "concern_index": 1,
+      "concern_text": "Global replication of customer profile data across borders requires a documented legal transfer mechanism (e.g., SCCs, adequacy decision, BCRs). No such mechanism is referenced in design_doc_v2 or replication_topology. This is a blocking GDPR compliance gap.",
+      "verdict": "partial",
+      "encroaches_on": "finops_legal_agent",
+      "justification": "Data residency and cross-border GDPR exposure are in-scope, but citing specific legal transfer mechanisms (SCCs, BCRs, adequacy decisions) reaches into legal/regulatory contract territory owned by finops_legal.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "security_privacy_agent",
+      "concern_index": 2,
+      "concern_text": "The design documentation does not explicitly confirm encryption at rest for customer profile data stores across all regions. Given the global nature of the service, every regional replica must have encryption at rest documented and enforced.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Encryption at rest for PII across regions is squarely within security/privacy domain, covering encryption and data residency.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "security_privacy_agent",
+      "concern_index": 3,
+      "concern_text": "There is no mention of audit logging for security-sensitive actions such as profile reads, writes, admin access, or bulk exports. GDPR and general security best practices require a durable audit trail for access to personal data.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Audit logging for access to personal data and GDPR exposure is explicitly within the security/privacy domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "security_privacy_agent",
+      "concern_index": 4,
+      "concern_text": "The design does not specify PII redaction or masking policies for application and diagnostic logs. Customer profile data (names, emails, addresses, etc.) must not appear in logs without explicit redaction controls documented in the design.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PII handling in logs and redaction controls are core to security/privacy domain including audit logging and PII protection.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "security_privacy_agent",
+      "concern_index": 5,
+      "concern_text": "No log retention policy is defined for any log groups associated with this service. GDPR requires that personal data not be retained longer than necessary; log groups must have defined and enforced retention windows.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Log retention tied to GDPR personal data handling and audit logging is squarely within security/privacy domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "security_privacy_agent",
+      "concern_index": 6,
+      "concern_text": "The design does not document IAM roles or access policies for the profile data stores. Given this service holds PII at global scale, least-privilege access control design must be explicitly defined before proceeding past this gate.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Access control and least-privilege for PII data stores is squarely within the security reviewer's stated domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "security_privacy_agent",
+      "concern_index": 7,
+      "concern_text": "A 'Global Customer Profile Service' may co-locate or later incorporate payment-related identifiers. If any payment card data or cardholder data could be stored in profiles, a PCI-DSS scope assessment is required. The design does not address this boundary.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PCI-DSS scope assessment and payment data boundaries are core regulatory exposure and PII handling concerns within the security/privacy domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "finops_legal_agent",
+      "concern_index": 0,
+      "concern_text": "The replication topology for a Global Customer Profile Service must explicitly document EU data residency controls. There is no evidence that EU customer profiles are restricted from replicating outside the EU, which is a GDPR Chapter V violation risk.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "GDPR data residency and cross-border transfer compliance is squarely within regulatory compliance, a core FinOps/Legal domain.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "finops_legal_agent",
+      "concern_index": 1,
+      "concern_text": "Cross-border replication of customer profile data requires a documented legal transfer mechanism (SCCs, BCRs, or adequacy decision). No such mechanism is referenced in the design artifacts.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Cross-border data transfer legal mechanisms (SCCs, BCRs, adequacy) are core regulatory compliance concerns within FinOps/Legal domain.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "finops_legal_agent",
+      "concern_index": 2,
+      "concern_text": "A globally replicated customer profile service will generate substantial cross-region data egress. No egress cost model is present in the design artifacts, making total cost of ownership undefined at this gate.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Concern is about egress cost model and undefined TCO, which is squarely FinOps cost ceilings and unit economics.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "finops_legal_agent",
+      "concern_index": 3,
+      "concern_text": "Global replication topology with no stated autoscaling or compute cost cap creates unbounded spend exposure. A maximum cost ceiling must be established before proceeding.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Cost ceilings and unbounded resource exposure are explicitly within FinOps domain; the concern targets spend caps, not the engineering implementation of autoscaling.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "finops_legal_agent",
+      "concern_index": 4,
+      "concern_text": "No cost estimate is provided for the global replication infrastructure, storage, or inter-region traffic. A verified cost estimate is required at the design gate.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Cost estimates for infrastructure, storage, and traffic are core FinOps concerns squarely within the reviewer's cost ceiling and unit economics domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "finops_legal_agent",
+      "concern_index": 5,
+      "concern_text": "The replication topology likely relies on one or more third-party cloud or database vendors. No vendor SLA terms are referenced, making the composite SLA target unverifiable from a contractual standpoint.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Vendor SLA terms and contractual verification fall squarely within FinOps/Legal domain of vendor contracts and SLAs.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "finops_legal_agent",
+      "concern_index": 6,
+      "concern_text": "Without documented vendor SLAs for each region and replication layer, it cannot be confirmed that the composite availability supports the strong consistency and sub-50ms global read targets in the acceptance criteria.",
+      "verdict": "partial",
+      "encroaches_on": "pm_agent",
+      "justification": "Vendor SLAs are squarely FinOps/Legal, but the concern is framed around whether acceptance criteria targets (consistency, latency) can be met, reaching into PM's product acceptance domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_005_cross_border_data_residency",
+      "agent": "finops_legal_agent",
+      "concern_index": 7,
+      "concern_text": "A customer profile service handling PII must ensure all access and mutation events are audit-logged. No audit logging requirement or control is documented in the design artifacts.",
+      "verdict": "partial",
+      "encroaches_on": "security_privacy_agent",
+      "justification": "Audit logging of PII access/mutation is primarily a security/privacy control. FinOps/Legal could touch compliance mandates, but the concern is framed as a missing security control rather than a specific regulatory obligation.",
+      "matched_seeded_defect": false
+    }
+  ]
+}

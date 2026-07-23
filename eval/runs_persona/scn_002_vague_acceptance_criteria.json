@@ -1,0 +1,248 @@
+{
+  "scenario_id": "scn_002_vague_acceptance_criteria",
+  "judge_model": "claude-opus-4-8",
+  "cost_usd": 0.452595,
+  "schema_failures": 2,
+  "verdicts": [
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "pm_agent",
+      "concern_index": 0,
+      "concern_text": "'Customers love the new checkout' is not a testable criterion. It has no numeric threshold, survey score, NPS delta, or measurement method defined. This cannot be used to make a pass/fail gate decision.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Concern is about measurable, testable acceptance criteria and pass/fail gate decisions, squarely within the PM's stated domain.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "pm_agent",
+      "concern_index": 1,
+      "concern_text": "'Conversion improves significantly' lacks a baseline conversion rate, a target uplift percentage, a confidence interval, and a measurement window. 'Significantly' is not a definition of done.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Critiquing vague success metrics and lack of measurable acceptance criteria is core PM scope\u2014demanding baseline, target, and measurement window for definition of done.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "pm_agent",
+      "concern_index": 2,
+      "concern_text": "'Page feels fast' is entirely subjective and unmeasurable. Acceptable criteria would reference a specific Core Web Vital (e.g., LCP < 2.5s, INP < 200ms) measured against a defined percentile (e.g., p75) in production traffic.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PM is challenging an unmeasurable acceptance criterion and proposing a measurable one. Defining evaluable success criteria is squarely in the PM's lane.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "pm_agent",
+      "concern_index": 3,
+      "concern_text": "No quantitative success metric exists for this project. Without a baseline and a target, it is impossible to evaluate whether this initiative succeeded after launch. Add at minimum: current conversion rate, target conversion rate, measurement methodology, and evaluation timeline.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Measurable success metrics, baselines, targets, and evaluation timeline are core PM concerns about whether the project can be evaluated.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "engineering_lead_agent",
+      "concern_index": 0,
+      "concern_text": "All three acceptance criteria are entirely subjective and unmeasurable: 'customers love', 'improves significantly', and 'feels fast' have no numeric thresholds, baseline comparisons, or testable definitions. These cannot be used to gate a release or validate success.",
+      "verdict": "partial",
+      "encroaches_on": "pm_agent",
+      "justification": "Measurable acceptance criteria and success definitions are primarily product scope, though testability of release gates touches operational maturity.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "engineering_lead_agent",
+      "concern_index": 1,
+      "concern_text": "No measurable success metrics are defined anywhere in the project state. There are no targets for conversion rate delta, p95 page load time, error rate, or any other quantifiable KPI. The project cannot be declared a success without these.",
+      "verdict": "partial",
+      "encroaches_on": "pm_agent",
+      "justification": "p95 latency and error rate are operational/reliability metrics within the eng lead's domain, but conversion rate delta and success-definition KPIs are product scope owned by PM.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "engineering_lead_agent",
+      "concern_index": 2,
+      "concern_text": "This is a checkout flow and likely handles payment card data. No PCI DSS scope assessment is referenced in the artifacts. Before design is approved, the team must determine whether this service is in-scope for PCI and what controls apply.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "security_privacy_agent",
+      "justification": "PCI DSS scope assessment and applicable controls are compliance/security concerns, not architectural or reliability patterns the engineering lead owns.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "engineering_lead_agent",
+      "concern_index": 3,
+      "concern_text": "Only a PRD artifact is present at the design gate. There is no rollback plan documented. Checkout is a revenue-critical path; a rollback strategy must be defined before engineering begins.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Rollback strategy and operational readiness for a revenue-critical path are reliability/operational maturity concerns squarely within an engineering lead's domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "engineering_lead_agent",
+      "concern_index": 4,
+      "concern_text": "The artifact list contains only 'prd_v2' with no technical design documents, architecture diagrams, or dependency maps. It is unclear whether the scope is well-bounded or bundles multiple feature areas. A technical design artifact is required to assess this properly.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Missing technical design docs, architecture diagrams, and dependency maps fall squarely within architectural soundness and dependency management, core to the engineering lead domain.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 0,
+      "concern_text": "This is a checkout improvement project that almost certainly touches payment card data flows, yet there is no PCI-DSS scope assessment documented in the artifacts. Before design can proceed, the team must determine whether this service enters, expands, or modifies PCI scope and document compensating controls or descoping evidence (e.g., tokenization, hosted fields).",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PCI-DSS scope assessment, payment card data flows, and compensating controls are squarely within security/privacy regulatory exposure domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 1,
+      "concern_text": "No mention of audit logging for security-sensitive checkout actions (payment attempts, address changes, coupon/discount applications, order confirmation). These events must be audit-logged with actor, timestamp, and outcome to satisfy PCI-DSS and general accountability requirements.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Audit logging for sensitive actions, actor/timestamp tracking, and PCI-DSS compliance are core to the security/privacy domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 2,
+      "concern_text": "Checkout flows collect highly sensitive PII (name, address, email, phone, partial card data). The design does not address log redaction strategy. Without explicit controls, PAN, CVV fragments, or full PII could be written to application or debug logs.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PII handling, PCI-DSS card data exposure, and audit/log redaction are core security and privacy domains.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 3,
+      "concern_text": "No log retention policy is defined. PCI-DSS requires audit logs to be retained for at least 12 months with 3 months immediately available. GDPR also constrains how long personal-data-bearing logs may be kept. Both constraints must be addressed in design.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Audit log retention under PCI-DSS and GDPR is squarely within audit logging, regulatory exposure, and PII handling domains.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 4,
+      "concern_text": "If the checkout serves EU customers, customer PII and order data must remain within the EU or have explicit residency controls. The PRD does not document data residency requirements or any region-pinning for storage and processing.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Data residency and regulatory exposure (GDPR) for PII are explicitly within the security/privacy reviewer's stated domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 5,
+      "concern_text": "No cross-border data transfer mechanism (SCCs, adequacy decision, BCRs) is documented. If payment processors, analytics providers, or CDN vendors process EU customer data outside the EU, a legal transfer mechanism must be identified at design time.",
+      "verdict": "partial",
+      "encroaches_on": "finops_legal_agent",
+      "justification": "Cross-border data residency and GDPR exposure are in-domain, but specifying legal transfer mechanisms like SCCs, adequacy decisions, and BCRs reaches into contractual/legal instrument territory owned by finops_legal.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 6,
+      "concern_text": "The design does not specify encryption-at-rest requirements for any data stores that will hold order data, customer PII, or payment tokens. Encryption-at-rest with managed key policies must be explicitly designed in, not assumed.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Encryption-at-rest for PII and payment tokens with key management is core to the security/privacy domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 7,
+      "concern_text": "No IAM / access-control design is present. Checkout services should operate under least-privilege roles. Without a defined IAM boundary, there is risk of over-permissioned service accounts able to read payment or customer data beyond their need.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Access control and least-privilege IAM for payment/customer data are core to the security and privacy domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "security_privacy_agent",
+      "concern_index": 8,
+      "concern_text": "Integration with payment processors and third-party services will require API keys. The design must mandate secrets management (e.g., Vault, AWS Secrets Manager) and explicitly prohibit secrets in source code or static config files.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Secrets management for API keys and prohibiting hardcoded secrets is squarely within the security reviewer's stated domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "finops_legal_agent",
+      "concern_index": 0,
+      "concern_text": "All three acceptance criteria ('customers love', 'improves significantly', 'feels fast') are qualitative and contain no numeric thresholds, baseline comparisons, or testable definitions. These cannot be used to make a gate decision or audit a release outcome.",
+      "verdict": "out_of_persona",
+      "encroaches_on": "pm_agent",
+      "justification": "Critiquing the testability and definition of acceptance criteria is product management's domain, not cost, contracts, compliance, or resource exposure.",
+      "matched_seeded_defect": true
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "finops_legal_agent",
+      "concern_index": 1,
+      "concern_text": "No measurable success metric is defined. There is no conversion rate target, p-value threshold, revenue impact estimate, or latency target (e.g., LCP < Xms). Without these, cost justification and ROI analysis are impossible.",
+      "verdict": "partial",
+      "encroaches_on": "pm_agent",
+      "justification": "The ROI/cost justification framing is FinOps, but demanding conversion rate targets, p-value thresholds, and success metrics reaches into PM's acceptance criteria domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "finops_legal_agent",
+      "concern_index": 2,
+      "concern_text": "No cost estimate is present in the artifact set for compute, third-party services, or infrastructure changes associated with checkout improvements. A design gate requires at least a rough order-of-magnitude cost estimate before proceeding.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Cost estimate and unit economics fall squarely within FinOps domain; requiring a ROM cost estimate at a gate is core to cost ceiling review.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "finops_legal_agent",
+      "concern_index": 3,
+      "concern_text": "Checkout improvements may introduce autoscaling or increased compute demand during peak traffic. No cost ceiling or spend cap is documented, creating unbounded resource exposure during high-traffic events.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Cost ceilings, spend caps, and unbounded resource exposure are explicitly within the FinOps reviewer's domain.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "finops_legal_agent",
+      "concern_index": 4,
+      "concern_text": "This project modifies the checkout flow, which is likely in or adjacent to card data scope. No PCI DSS scope assessment or carve-out documentation is present in the artifact set. This is a mandatory compliance gate item before design can be approved.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "PCI DSS regulatory compliance and mandatory compliance gating fall squarely within the FinOps/Legal reviewer's stated domain of regulatory compliance.",
+      "matched_seeded_defect": false
+    },
+    {
+      "scenario_id": "scn_002_vague_acceptance_criteria",
+      "agent": "finops_legal_agent",
+      "concern_index": 5,
+      "concern_text": "Checkout flows typically depend on payment processors and potentially A/B testing or analytics vendors. No vendor SLA terms are referenced in the available artifacts, creating unquantified third-party reliability risk.",
+      "verdict": "in_persona",
+      "encroaches_on": null,
+      "justification": "Vendor SLAs and third-party reliability risk fall squarely within the FinOps/Legal domain of vendor contracts and SLAs.",
+      "matched_seeded_defect": false
+    }
+  ]
+}

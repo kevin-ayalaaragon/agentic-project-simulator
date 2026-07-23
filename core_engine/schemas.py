@@ -216,4 +216,8 @@ class PersonaJudgement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     verdict: PersonaVerdict
+    encroaches_on: AgentRole | None = Field(
+        default=None,
+        description="Role whose domain the concern reaches into. Null when in_persona.",
+    )
     justification: str = Field(..., min_length=10, max_length=400)
