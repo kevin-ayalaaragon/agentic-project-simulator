@@ -1,5 +1,5 @@
 # Eval Report (V1 Baseline)
-_Generated 2026-06-08T16:40:01+00:00_
+_Generated 2026-07-23T02:58:59+00:00_
 _Scenarios scored: 10_
 
 ## Master Table
@@ -9,6 +9,8 @@ _Scenarios scored: 10_
 | Structural | Format pass rate | 100% (40/40) (retries used: 2) |
 | Functional | Defect-detection recall (suite mean) | 0.93 |
 | Functional | Defect-detection strict precision (suite mean) | 0.11 |
+
+Recall is the mean across scenarios carrying seeded defects, since recall is undefined where zero defects are seeded. Strict precision is the mean across scenarios that raised at least one flag.
 
 ## Per-Scenario L2
 
@@ -21,16 +23,18 @@ _Scenarios scored: 10_
 | scn_005_cross_border_data_residency | 2 | 2 | 1.00 | 34 | 7 | 0.21 |
 | scn_006_mid_sprint_scope_addition | 3 | 3 | 1.00 | 38 | 8 | 0.21 |
 | scn_007_ledger_service_circular_dependency | 2 | 1 | 0.50 | 34 | 1 | 0.03 |
-| scn_008_clean_idempotency_key_rollout | 0 | 0 | 1.00 | 21 | 0 | 0.00 |
-| scn_009_clean_observability_dashboard | 0 | 0 | 1.00 | 29 | 0 | 0.00 |
-| scn_010_clean_db_index_addition | 0 | 0 | 1.00 | 20 | 0 | 0.00 |
+| scn_008_clean_idempotency_key_rollout | 0 | 0 | n/a | 21 | 0 | 0.00 |
+| scn_009_clean_observability_dashboard | 0 | 0 | n/a | 29 | 0 | 0.00 |
+| scn_010_clean_db_index_addition | 0 | 0 | n/a | 20 | 0 | 0.00 |
+
+Recall reads n/a for clean scenarios, which seed no defects. Those rows are excluded from the suite recall mean and included in the strict precision mean.
 
 ## Unmatched Flags (264 total)
 
-These concerns did not match any seeded defect ID. Triage each:
+These concerns did not match any seeded defect ID. Each falls into one of three categories:
 
-- **Real but unseeded**: the agent caught a legitimate issue you didn't seed. 
-  Add it to the scenario's `seeded_defects` so recall and precision both improve.
+- **Real but unseeded**: the agent caught a legitimate issue not present in the seeded set. 
+  Adding it to the scenario's `seeded_defects` improves both recall and precision.
 - **Noise**: the agent over-flagged. Counts as a true false positive.
 - **Catalog typo**: the agent malformed a defect ID (e.g. `def_def_pii_in_logs`). 
   This is a V1 schema-discipline failure; tool-use enforcement in V2 prevents it.
