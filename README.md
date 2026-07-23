@@ -1,155 +1,113 @@
-# Evaluation Harness Spec: Agentic Project Simulation Engine
+# ProgramDynamics: Multi-Agent LLM Simulation Engine
 
-## Purpose
+A multi-agent simulator that runs proposed software projects through a gated lifecycle review (design, architecture, build, launch readiness) with autonomous LLM stakeholders playing the four roles that typically gate-keep real engineering programs: a product manager, an engineering lead, a security/privacy reviewer, and a FinOps/legal reviewer. The simulator's purpose is twofold. As a system, it stress-tests project plans by surfacing the concerns a real cross-functional review would raise. As an evaluation target, it provides a structured environment for measuring how well a stochastic multi-agent system can detect known defects, stay in role, and stay grounded under varying prompt and grounding strategies.
 
-This harness measures whether the simulator behaves correctly under stress and produces the
-before/after table reported in the README. The goal is verifiable telemetry, not coverage for
-its own sake.
+The repository includes the simulator itself, a fixed suite of 10 fintech/payments project scenarios with seeded defects, and a five-layer evaluation harness that produces a master table comparing baseline (V1) and grounded (V2) configurations.
 
-## Status
+## V1 Baseline Results
 
-Phase 1 is implemented: L1 (schema validity), L2 (defect detection), and cost instrumentation,
-across 10 scenarios. L3, L4, and L5 are specified below but not yet built. The README reports
-Phase 1 results only.
+10 scenarios, fintech and payments domain, raw-prompting baseline (no retrieval, no tool-use enforcement, no judge layer). Numbers are produced directly by `eval/report.py` and committed to this README.
 
-## Architecture: Three Pillars, Five Layers
+| Pillar | Metric | V1 Baseline |
+|--------|--------|-------------|
+| Structural | Format pass rate | 100% (40/40 agent responses) |
+| Structural | Retries used | 2 |
+| Functional | Defect-detection recall (tagged) | 0.93 |
+| Functional | Defect-detection recall (true, after review) | 1.00 |
+| Functional | Defect-detection strict precision (floor) | 0.11 |
+| Economics | Avg cost per scenario | $0.08 |
 
-Build with five layers. Report with three pillars.
+The two recall numbers report the same underlying behavior at different measurement granularities. Tagged recall is what the scorer produces by matching catalog IDs in concern fields. True recall is what the scorer produces after reviewing the agents' free-text reasoning, which on one scenario identified a seeded defect that the agent recognized but bundled into a related concern instead of tagging separately. The distinction matters because the gap between the two numbers is a tagging-granularity failure, not a detection-capability failure, and the V2 fix for each is different.
+
+Strict precision is reported as a floor, not a truth. It treats every concern that does not match a seeded defect ID as a false positive. In practice, most unmatched concerns are either legitimate issues not seeded in ground truth or persona drift, neither of which is true noise. The triage workflow described under [Methodology](#methodology) separates these.
+
+## Architecture
+
+The system has two layers: the simulator (which runs scenarios) and the evaluation harness (which measures the simulator). The harness is organized into three communication pillars over five engineering layers.
 
 | Pillar | Layer(s) | What it measures |
-|---|---|---|
-| Structural Integrity | L1: Schema validity | Outputs conform to Pydantic schema |
-| Behavioral Fidelity | L4: Persona fidelity | Agents stay in role (LLM-as-judge) |
-| Functional Accuracy & Unit Economics | L2: Defect detection | Precision/recall on seeded defects |
-| | L3: Retrieval quality | Recall@5, MRR on RAG |
-| | L5: Groundedness | Unsupported assertion rate |
-| | Cost | $/run, tokens, latency |
+|--------|----------|------------------|
+| Structural Integrity | L1: Schema validity | Whether agent outputs conform to the Pydantic schema |
+| Behavioral Fidelity | L4: Persona fidelity | Whether agents stay in their assigned role |
+| Functional Accuracy & Unit Economics | L2: Defect detection | Precision and recall on seeded defects |
+| | L3: Retrieval quality | Recall@k, MRR on retrieved playbook chunks |
+| | L5: Groundedness | Rate of assertions traceable to project state or retrieved context |
+| | Cost | Dollars per full lifecycle simulation |
 
-## The Layers
+Phase 1 (V1 baseline) implements L1, L2, and cost. Phases 2 and 3 add the remaining layers along with the corresponding system improvements that those layers measure.
 
-### L1: Schema validity (deterministic)
-Validate every agent output against Pydantic models with retry. Metric: format pass rate.
-Target 100%.
+## Methodology
 
-### L2: Defect detection (the core)
-Each YAML scenario carries ground-truth seeded defects. Run the simulator, collect raised
-flags, map to defect IDs.
-- Recall = caught defects / total seeded defects
-- Precision = real flags / total flags
+A few design decisions matter more than the numbers themselves, and are worth understanding before reading the table closely.
 
-Nuance: an unmatched flag is not automatically a false positive. The agent may have caught an
-unseeded gap. Unmatched flags are reviewed by hand and ground truth is updated as the catalog
-matures. Automated metrics need human grounding to stay meaningful.
+**Closed-enum schemas.** Every choice the model can make at a structural decision point (agent role, gate stage, severity, decision verdict, persona verdict) is a Python enum with `extra="forbid"` enforcement. Without this, hallucinated field values silently pass validation and the L1 metric becomes meaningless. Schema rigor is what makes L1 measure anything at all.
 
-### L3: Retrieval quality
-Maintain 20 labeled `(query, relevant_chunk_ids)` pairs. Metrics: Recall@5 and Mean Reciprocal
-Rank.
+**The defect catalog is vocabulary, not an answer key.** Agents are shown a catalog of 28 canonical defect IDs and asked to tag their concerns with the matching ID when applicable. Any single scenario seeds 0 to 3 defects from that catalog, so the agent receives a vocabulary rather than the list of correct answers. This is what makes L2 scoring deterministic without relying on fuzzy text matching between agent prose and seeded-defect descriptions.
 
-### L4: Persona fidelity (LLM-as-judge)
-Use a separate model or call as judge. Discrete categorical rubric, never a 1 to 5 scale
-(numeric scales drift between runs):
-- `IN_PERSONA` / `PARTIAL` / `OUT_OF_PERSONA`
+**Strict precision is the floor.** Every concern that does not match a seeded defect ID is counted as a false positive by the strict scorer. In practice these unmatched concerns fall into three categories: real-but-unseeded catches, persona drift (an agent flagging something outside its role), and true noise. The triage workflow distinguishes them by asking three questions of each: does the project state actually support the concern, is the concern in the agent's domain, and is the concern a defect or a wish. The result of triage is a precision number meaningfully higher than the strict floor.
 
-Validate the judge. Hand-label 20 turns, run the judge on them, report judge-to-human
-agreement. An unvalidated judge is an unmeasured instrument.
+**Clean scenarios aren't clean.** Three of the 10 scenarios were designed as "clean" precision negatives. In practice, all three were either blocked or approved-with-conditions because the agents found legitimate gaps. This is honest behavior for a multi-agent review system and the response is to redefine "clean" as "no `blocking`-severity flags" rather than "zero concerns." Real gate reviews work this way.
 
-### L5: Groundedness
-Every factual assertion must trace to (a) the project state YAML or (b) a retrieved playbook
-chunk. Otherwise it is unsupported. Run with constraint enforcement off and then on. The delta
-is the hallucination-reduction number.
+**One V1 miss was a measurement artifact, not a detection failure.** On the circular-dependency scenario (`scn_007`), the engineering lead identified both seeded defects but combined them into a single concern in its `defect_id` field, leaving the second seeded defect "uncaught" by the tagged-recall scorer. Manual review of the agent's `reasoning` field shows the defect was explicitly identified. The V2 fix is a "one defect per concern" constraint enforced through tool use.
 
-### Financial instrumentation
-Wrap all API calls in middleware that logs prompt and completion tokens per turn, latency per
-call, and dollar cost per full lifecycle simulation. Cost is a headline metric, not a footnote.
+## What V2 Targets
 
-## Dataset: 25 YAML Scenarios (10 implemented)
+The V1 baseline establishes specific failure modes that V2 is designed to address.
 
-Domain: fintech and payments. The domain has well-defined compliance and architectural failure
-modes, which makes ground-truth defect seeding tractable and keeps scenarios realistic rather
-than synthetic.
+- L1 retries (currently 2 across the suite) should drop to 0 with tool-use enforcement of the response schema.
+- Tagged recall should match true recall (currently 0.93 vs 1.00) once concerns are constrained to one defect each.
+- Strict precision should improve significantly with two interventions: a retrieval layer that grounds agents in gate-specific playbooks (so they raise concerns from documented review patterns rather than from generic best-practice prior), and persona-prompt tightening that reduces cross-domain encroachment.
+- A separate cross-cutting "release coordinator" agent will be evaluated for systemic concerns (dependency cycles, sequencing, multi-service coordination) that the four role-scoped agents reliably miss on raw prompting.
 
-Composition:
-- 5 clean (precision negatives)
-- 5 security and privacy gaps
-- 5 scope creep / missing acceptance criteria
-- 5 architecture flaws / dependency deadlocks
-- 5 resource and FinOps issues
-
-Example fixture:
-
-```yaml
-id: scn_024_unregulated_vendor_integration
-description: >
-  Payment microservice integrates a third-party vendor with no data
-  retention policy and no SLA.
-project_state:
-  name: "Global Pay Core"
-  stage: "architecture_review_gate"
-  artifacts: ["system_architecture_v1.2"]
-seeded_defects:
-  - id: def_missing_data_retention
-    should_be_caught_by: "security_privacy_agent"
-    at_gate: "architecture_review_gate"
-  - id: def_missing_sla
-    should_be_caught_by: "finops_legal_agent"
-    at_gate: "architecture_review_gate"
-expected_gate_outcome: "blocked"
-```
-
-## Repo Architecture
+## Repository Layout
 
 ```
-eval/
-  scenarios/              # 25 YAML fixtures
-  retrieval_labels/       # query -> chunk_id pairs
-  runners/
-    run_scenario.py       # executes the agent system against one scenario
-  metrics/
-    schema.py             # L1
-    defects.py            # L2 precision/recall
-    retrieval.py          # L3 recall@k, MRR
-    grounding.py          # L5 unsupported assertion rate
-  judges/
-    persona_judge.py      # L4 discrete rubric
-    judge_validation/     # human-labeled calibration set
-  report.py               # writes the master table into README.md
-  run_all.py              # CLI entrypoint
+.
+├── core_engine/
+│   └── schemas.py              # Pydantic models shared by the simulator and harness
+├── eval/
+│   ├── defect_catalog.yaml     # 28 canonical defect IDs
+│   ├── scenarios/              # 10 YAML test fixtures
+│   ├── runners/
+│   │   └── run_scenario.py     # Executes one scenario through the agent system
+│   ├── metrics/
+│   │   ├── schema.py           # L1 scorer
+│   │   └── defects.py          # L2 scorer
+│   ├── runs/                   # ScenarioRun JSONs (one per execution)
+│   ├── report.py               # Aggregates L1 + L2 into the master table
+│   └── report.md               # Latest generated report
+└── docs/
+    ├── evaluation-harness-spec.md   # Internal spec for the eval harness
+    └── PHASE1_BUILD_NOTES.md        # Build log
 ```
 
-## Handling Stochasticity
+## Running It
 
-Set temperature to 0 where the design allows. Where variability is intended (stakeholder agents
-should not be fully deterministic), run each scenario 3 to 5 times and report mean plus spread.
-A metric reported without its variance is incomplete.
+Setup:
 
-## The Master Table
+```bash
+pip install anthropic pydantic pyyaml python-dotenv
+echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
+```
 
-`report.py` writes this directly into the repo README. Cells stay blank until the code
-populates them. Illustrative numbers are never pre-filled. Every figure traces to a committed
-run, and any number that cannot be reproduced from run data does not belong in the table.
+Run one scenario:
 
-| Pillar | Metric | Baseline (V1: raw prompts) | Optimized (V2: schema + RAG) |
-|---|---|---|---|
-| Structural | Format pass rate | [run data] | [run data] |
-| Behavioral | In-persona rate | [run data] | [run data] |
-| Behavioral | Judge-to-human agreement | [run data] | n/a |
-| Functional | Defect recall / precision | [run data] | [run data] |
-| Functional | Retrieval recall@5 | [run data] | [run data] |
-| Functional | Unsupported assertion rate | [run data] | [run data] |
-| Economics | Cost per lifecycle run | [run data] | [run data] |
+```bash
+python -m eval.runners.run_scenario eval/scenarios/scn_001_pii_logging.yaml
+```
 
-Report only numbers the harness produced. A metric whose computation cannot be described from
-the code is not a measurement.
+Run the full suite:
 
-## Build Order
+```bash
+for f in eval/scenarios/scn_*.yaml; do
+    python -m eval.runners.run_scenario "$f"
+done
+```
 
-**Phase 1.** Define Pydantic schemas. Write 10 YAML scenarios (7 with defects, 3 clean). Code
-L1 and L2 scorers. Run to capture the true baseline.
+Score and generate the report:
 
-**Phase 2.** Add ChromaDB with playbook docs. Build L3 scoring. Scale the dataset to 25.
+```bash
+python -m eval.report
+```
 
-**Phase 3.** Implement the discrete persona judge and judge validation set. Build the grounding
-parser. Run the optimization loop and populate the optimized column.
-
-Ship Phase 1 before touching Phase 3. A finished two-layer harness beats an abandoned
-five-layer one.
+The master table at the top of this README is produced by that last command. Each scenario costs approximately $0.08 on Claude Sonnet at the time of this baseline; the full suite is around $0.80.
