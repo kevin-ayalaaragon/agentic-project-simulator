@@ -2,7 +2,7 @@
 
 - Dedupes stale runs: keeps the most recent run per scenario_id (by finished_at).
 - Writes the populated master table and the unmatched-flag triage list to
-  a single markdown file you can commit or paste into the README.
+  a single markdown file for commit or transcription into the README.
 - Prints the summary block to stdout.
 
 Usage:
@@ -66,25 +66,40 @@ def build_report(runs_dir: Path, scenarios_dir: Path) -> str:
         f"{l2.suite_strict_precision:.2f} |"
     )
     lines.append("")
+    lines.append(
+        "Recall is the mean across scenarios carrying seeded defects, since recall is "
+        "undefined where zero defects are seeded. Strict precision is the mean across "
+        "scenarios that raised at least one flag."
+    )
+    lines.append("")
 
     lines.append("## Per-Scenario L2")
     lines.append("")
     lines.append("| Scenario | Seeded | Caught | Recall | Flags | Matched | Strict Precision |")
     lines.append("|----------|--------|--------|--------|-------|---------|------------------|")
     for s in l2.per_scenario:
+        recall_cell = "n/a" if s.seeded_count == 0 else f"{s.recall:.2f}"
         lines.append(
             f"| {s.scenario_id} | {s.seeded_count} | {s.caught_count} | "
-            f"{s.recall:.2f} | {s.total_flags} | {s.matched_flags} | "
+            f"{recall_cell} | {s.total_flags} | {s.matched_flags} | "
             f"{s.strict_precision:.2f} |"
         )
+    lines.append("")
+    lines.append(
+        "Recall reads n/a for clean scenarios, which seed no defects. Those rows are "
+        "excluded from the suite recall mean and included in the strict precision mean."
+    )
     lines.append("")
 
     lines.append(f"## Unmatched Flags ({len(l2.all_unmatched)} total)")
     lines.append("")
-    lines.append("These concerns did not match any seeded defect ID. Triage each:")
+    lines.append(
+        "These concerns did not match any seeded defect ID. Each falls into one of three "
+        "categories:"
+    )
     lines.append("")
-    lines.append("- **Real but unseeded**: the agent caught a legitimate issue you didn't seed. ")
-    lines.append("  Add it to the scenario's `seeded_defects` so recall and precision both improve.")
+    lines.append("- **Real but unseeded**: the agent caught a legitimate issue not present in the seeded set. ")
+    lines.append("  Adding it to the scenario's `seeded_defects` improves both recall and precision.")
     lines.append("- **Noise**: the agent over-flagged. Counts as a true false positive.")
     lines.append("- **Catalog typo**: the agent malformed a defect ID (e.g. `def_def_pii_in_logs`). ")
     lines.append("  This is a V1 schema-discipline failure; tool-use enforcement in V2 prevents it.")
