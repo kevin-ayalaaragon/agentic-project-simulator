@@ -97,3 +97,59 @@ expected_gate_outcome: "blocked"
 ```
 
 ## Repo Architecture
+
+```
+eval/
+  scenarios/              # 25 YAML fixtures
+  retrieval_labels/       # query -> chunk_id pairs
+  runners/
+    run_scenario.py       # executes the agent system against one scenario
+  metrics/
+    schema.py             # L1
+    defects.py            # L2 precision/recall
+    retrieval.py          # L3 recall@k, MRR
+    grounding.py          # L5 unsupported assertion rate
+  judges/
+    persona_judge.py      # L4 discrete rubric
+    judge_validation/     # human-labeled calibration set
+  report.py               # writes the master table into README.md
+  run_all.py              # CLI entrypoint
+```
+
+## Handling Stochasticity
+
+Set temperature to 0 where the design allows. Where variability is intended (stakeholder agents
+should not be fully deterministic), run each scenario 3 to 5 times and report mean plus spread.
+A metric reported without its variance is incomplete.
+
+## The Master Table
+
+`report.py` writes this directly into the repo README. Cells stay blank until the code
+populates them. Illustrative numbers are never pre-filled. Every figure traces to a committed
+run, and any number that cannot be reproduced from run data does not belong in the table.
+
+| Pillar | Metric | Baseline (V1: raw prompts) | Optimized (V2: schema + RAG) |
+|---|---|---|---|
+| Structural | Format pass rate | [run data] | [run data] |
+| Behavioral | In-persona rate | [run data] | [run data] |
+| Behavioral | Judge-to-human agreement | [run data] | n/a |
+| Functional | Defect recall / precision | [run data] | [run data] |
+| Functional | Retrieval recall@5 | [run data] | [run data] |
+| Functional | Unsupported assertion rate | [run data] | [run data] |
+| Economics | Cost per lifecycle run | [run data] | [run data] |
+
+Report only numbers the harness produced. A metric whose computation cannot be described from
+the code is not a measurement.
+
+## Build Order
+
+**Phase 1.** Define Pydantic schemas. Write 10 YAML scenarios (7 with defects, 3 clean). Code
+L1 and L2 scorers. Run to capture the true baseline.
+
+**Phase 2.** Add ChromaDB with playbook docs. Build L3 scoring. Scale the dataset to 25.
+
+**Phase 3.** Implement the discrete persona judge and judge validation set. Build the grounding
+parser. Run the optimization loop and populate the optimized column.
+
+Ship Phase 1 before touching Phase 3. A finished two-layer harness beats an abandoned
+five-layer one.
