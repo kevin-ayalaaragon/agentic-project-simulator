@@ -4,7 +4,7 @@ A multi-agent simulator that runs proposed software projects through a gated lif
 
 The repository includes the simulator itself, a fixed suite of 10 fintech/payments project scenarios with seeded defects, and a five-layer evaluation harness that produces a master table comparing baseline (V1) and grounded (V2) configurations.
 
-## V1 Baseline Results
+## Results
 
 10 scenarios, fintech and payments domain, raw-prompting baseline (no retrieval, no tool-use enforcement). Structural, Functional, and Economics rows are produced by `eval/report.py`; Behavioral rows by `eval/metrics/persona.py`. All numbers committed to this README.
 
