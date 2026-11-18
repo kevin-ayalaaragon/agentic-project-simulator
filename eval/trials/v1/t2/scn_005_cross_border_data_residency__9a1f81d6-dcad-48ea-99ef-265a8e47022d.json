@@ -1,0 +1,346 @@
+{
+  "scenario_id": "scn_005_cross_border_data_residency",
+  "run_id": "9a1f81d6-dcad-48ea-99ef-265a8e47022d",
+  "started_at": "2026-11-18T19:38:59.057727Z",
+  "finished_at": "2026-11-18T19:40:26.707861Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "\"Strong consistency on writes\" is not a testable acceptance criterion. It lacks a defined test method, failure threshold, consistency model (linearizability? sequential?), and measurable outcome. This must be rewritten with a specific, verifiable definition before passing design gate.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "high",
+              "concern_text": "The project has no business-level success metric. 'Profile reads under 50ms' is an operational SLO, not a success metric. Missing: adoption rate, error rate target, customer satisfaction, or business KPI that would indicate the service is delivering value.",
+              "references": []
+            },
+            {
+              "defect_id": "def_sla_math_broken",
+              "severity": "high",
+              "concern_text": "The replication topology artifact is listed but no composite SLA math is documented. A globally distributed profile service with strong write consistency requires careful availability math across regions. Without this, the 50ms global read target may be unachievable or unverifiable.",
+              "references": [
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "high",
+              "concern_text": "Global replication topology implies significant cross-region data egress costs. No egress cost model is present in the artifact list. At scale, this could represent a material budget risk that must be modeled before the design is approved.",
+              "references": [
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "high",
+              "concern_text": "This is a 'Global Customer Profile Service' with a replication topology. EU customer PII replicating outside the EU without residency controls is a significant compliance risk. The design artifacts do not document any data residency or sovereignty controls.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "medium",
+              "concern_text": "No rollback plan is referenced in the artifact list. For a globally replicated service with strong consistency requirements, a rollback scenario involving partial replication or schema migration could be highly complex and must be documented at design gate.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "No cost estimate artifact is present. A globally replicated profile service with strong consistency is likely infrastructure-intensive. A cost estimate or at minimum a cost ceiling should be established before design is approved.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_idempotency",
+              "severity": "medium",
+              "concern_text": "Design doc does not document idempotency guarantees for write operations. Given strong consistency requirements and global replication, duplicate write handling and idempotency keys should be explicitly addressed in the design.",
+              "references": [
+                "design_doc_v2"
+              ]
+            }
+          ],
+          "reasoning": "This project is blocked at design gate due to two primary issues: the acceptance criteria are incomplete and partially untestable, and several high-severity architectural and compliance risks are unaddressed. The 'strong consistency on writes' criterion has no testable definition, making it impossible to evaluate at any subsequent gate. Beyond acceptance criteria, the design for a global customer profile service must address EU data residency controls given GDPR obligations for PII, provide composite SLA math validating the 50ms global read target against the replication topology, and include an egress cost model for cross-region data flows. Additionally, no rollback plan, no cost estimate, and no idempotency documentation are present. The absence of a business-level success metric means the project cannot be evaluated for value delivery post-launch. These are not minor gaps — they represent foundational design decisions that could force architectural rework if deferred. The team should revise the design doc to address all blocking and high-severity items before returning to gate."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_no_timeout",
+              "severity": "high",
+              "concern_text": "Design doc v2 does not specify timeout configurations for synchronous cross-region profile read calls. Without enforced timeouts, a slow replica can cascade into full request queue saturation, directly threatening the 50ms global read SLA.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_circuit_breaker",
+              "severity": "high",
+              "concern_text": "The replication topology shows critical-path dependencies on regional replica nodes with no documented circuit breaker or fallback strategy. If a regional replica degrades, there is no mechanism to serve stale reads or fail fast gracefully.",
+              "references": [
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_sla_math_broken",
+              "severity": "blocking",
+              "concern_text": "Acceptance criteria require both sub-50ms global reads AND strong consistency on writes. These two requirements are in direct tension across a geographically distributed system. The design doc does not demonstrate how replication lag and quorum-write latency are reconciled to meet both SLAs simultaneously. No dependency SLA analysis is present.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_single_point_of_failure",
+              "severity": "high",
+              "concern_text": "The replication topology does not clearly indicate redundancy at the write-coordinator tier. If strong consistency is enforced through a single coordinator per region, that node is a single point of failure for all writes in that region.",
+              "references": [
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_idempotency",
+              "severity": "high",
+              "concern_text": "Profile write/update endpoints are not documented as idempotent. Given strong-consistency requirements and potential retry behavior under network partitions, non-idempotent writes risk duplicate profile mutations or data corruption.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "blocking",
+              "concern_text": "The replication topology shows global data replication, but there is no documented residency control to prevent EU customer profile data from being replicated to non-EU regions. This is a blocking compliance risk for a customer profile service handling PII.",
+              "references": [
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "Design doc v2 does not specify audit logging for security-sensitive profile operations such as reads of sensitive fields, updates, or admin overrides. For a global customer profile service, audit trails are essential for compliance and incident investigation.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "medium",
+              "concern_text": "Global replication topology implies significant cross-region data egress. No egress cost model or estimate is included in the design artifacts. At global scale with continuous replication, this cost could be substantial and unpredictable.",
+              "references": [
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "medium",
+              "concern_text": "Neither artifact documents a rollback procedure for failed deployments. For a globally replicated profile store with strong consistency requirements, schema migrations or replication topology changes could require complex rollback coordination.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_backpressure",
+              "severity": "medium",
+              "concern_text": "Design doc v2 does not describe backpressure mechanisms for write ingestion paths. High write burst traffic without queue depth limits or admission control risks overwhelming the consistency coordination layer.",
+              "references": [
+                "design_doc_v2"
+              ]
+            }
+          ],
+          "reasoning": "This design is blocked primarily due to three critical issues: (1) The acceptance criteria require both sub-50ms global reads and strong consistency on writes, but no analysis demonstrates these are simultaneously achievable across the described replication topology—this is a fundamental architectural correctness failure. (2) EU data residency controls are absent from the replication topology, creating a blocking compliance risk for a customer profile service that by definition handles PII globally. (3) The absence of circuit breakers, timeouts, and fallback strategies on critical-path replica dependencies means the 50ms SLA target has no reliability foundation. Additional high-severity gaps include missing idempotency guarantees on write endpoints, no audit logging specification, and an undocumented single point of failure at the write-coordinator tier. Medium concerns around egress cost modeling, rollback planning, and backpressure must also be addressed before re-review. The design needs significant revision across reliability patterns, compliance controls, and SLA feasibility analysis before it can proceed."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "blocking",
+              "concern_text": "The replication_topology artifact indicates global replication, but there is no evidence of EU data residency controls. EU customer profile data (which constitutes PII) must not be replicated to non-EU regions without explicit residency enforcement such as region-locked shards or partition keys.",
+              "references": [
+                "GDPR Art. 44-49",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_transfer_mechanism",
+              "severity": "blocking",
+              "concern_text": "No documented legal mechanism (SCCs, BCRs, adequacy decisions) exists for cross-border transfers of EU customer profile data. Global replication across jurisdictions requires a valid transfer basis under GDPR before the design is approved.",
+              "references": [
+                "GDPR Art. 46",
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "high",
+              "concern_text": "The design documentation does not specify encryption-at-rest for the customer profile data store. Customer profiles contain PII and must be encrypted at rest using an approved key management solution (e.g., AES-256 with customer-managed keys or equivalent).",
+              "references": [
+                "design_doc_v2",
+                "GDPR Art. 32"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "No audit logging strategy is documented for security-sensitive operations such as profile reads, writes, deletions, and administrative access. Access to PII must be fully auditable to satisfy GDPR accountability and breach investigation requirements.",
+              "references": [
+                "design_doc_v2",
+                "GDPR Art. 5(2)",
+                "GDPR Art. 30"
+              ]
+            },
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "high",
+              "concern_text": "The design does not define a PII redaction or masking strategy for application and diagnostic logs. With a global customer profile service, raw PII (names, emails, addresses) is likely to appear in logs without explicit redaction controls documented.",
+              "references": [
+                "design_doc_v2",
+                "GDPR Art. 5(1)(f)"
+              ]
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "medium",
+              "concern_text": "No log retention policy is specified in the design artifacts. Retaining PII-containing logs indefinitely violates GDPR data minimization and storage limitation principles. A defined retention period and automated purge mechanism must be specified.",
+              "references": [
+                "design_doc_v2",
+                "GDPR Art. 5(1)(e)"
+              ]
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "The design does not define IAM roles or access policies for the profile service. Given the PII sensitivity, least-privilege roles must be explicitly scoped per service component (read path, write path, admin, replication) before approval.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "medium",
+              "concern_text": "A 'Global Customer Profile Service' may store payment-linked identifiers or be queried by payment flows. No PCI-DSS scope assessment is documented. If any cardholder data or payment tokens are included in profiles, PCI scope must be formally assessed.",
+              "references": [
+                "design_doc_v2",
+                "PCI-DSS Requirement 3"
+              ]
+            }
+          ],
+          "reasoning": "The Global Customer Profile Service design presents multiple blocking and high-severity security and privacy deficiencies that prevent approval at this gate. The most critical issues are the absence of EU data residency controls and lack of any documented legal transfer mechanism for cross-border replication of EU PII — both are hard blockers under GDPR. Additionally, the design omits encryption-at-rest specifications, audit logging strategy, PII redaction in logs, and log retention policies, all of which are foundational requirements for a service handling global customer PII at scale. IAM access control design is absent, creating overbroad access risk across replication nodes and service tiers. A PCI scope assessment must also be performed to determine whether cardholder-linked identifiers fall within the service boundary. The design must be revised to address the two blocking concerns (residency and transfer mechanism) and all high-severity items before resubmission. Conditional approval is not appropriate given the blocking GDPR exposure."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "blocking",
+              "concern_text": "No maximum cost cap or autoscaling ceiling is documented for this globally replicated service. A 'Global Customer Profile Service' with multi-region replication can generate unbounded compute and storage costs under traffic spikes. A cost ceiling must be defined before proceeding.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "blocking",
+              "concern_text": "The replication_topology artifact implies cross-region data flows, but no egress cost model is present. Global replication can generate substantial and unpredictable egress charges. A quantified egress cost estimate per region pair is required.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "blocking",
+              "concern_text": "No overall cost estimate is provided in the design artifacts. For a globally distributed profile service, storage, compute, replication, and egress costs must be estimated and approved before the design gate is passed.",
+              "references": []
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "blocking",
+              "concern_text": "The service is described as 'Global' and stores customer profile data, which likely includes EU personal data. The design artifacts contain no documented data residency controls to prevent EU personal data from replicating to non-EU regions in violation of GDPR.",
+              "references": [
+                "GDPR Art. 44-49"
+              ]
+            },
+            {
+              "defect_id": "def_no_transfer_mechanism",
+              "severity": "blocking",
+              "concern_text": "No documented legal mechanism (Standard Contractual Clauses, Binding Corporate Rules, adequacy decisions, etc.) for cross-border personal data transfers is present in the design artifacts. This is required before replication topology is finalized.",
+              "references": [
+                "GDPR Art. 46",
+                "Schrems II"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "high",
+              "concern_text": "The replication topology likely relies on third-party cloud or CDN vendors, but no vendor SLA terms are referenced or attached. Without confirmed vendor SLAs, the composite availability and latency commitments cannot be validated from a contractual standpoint.",
+              "references": []
+            },
+            {
+              "defect_id": "def_sla_math_broken",
+              "severity": "high",
+              "concern_text": "Strong consistency on writes across global regions combined with sub-50ms reads is an extremely demanding composite SLA target. Without documented vendor SLAs and a composite SLA calculation, there is no basis to confirm this target is contractually achievable.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "Customer profile data constitutes personal data under GDPR and similar regulations. The design does not document audit logging requirements for access and mutations to profile records. This is a compliance gap that must be addressed at design stage.",
+              "references": [
+                "GDPR Art. 30",
+                "GDPR Art. 32"
+              ]
+            }
+          ],
+          "reasoning": "This design gate submission for the Global Customer Profile Service presents multiple blocking FinOps and legal concerns that prevent approval. On the cost side, there is no defined autoscaling ceiling, no egress cost model for the cross-region replication topology, and no overall cost estimate — any one of these alone would be sufficient to block at this gate. On the legal and compliance side, the global nature of the service combined with customer profile (personal) data creates clear GDPR exposure: there are no data residency controls documented to prevent EU personal data from flowing to non-EU regions, and no cross-border transfer mechanism (SCCs or equivalent) is referenced. Additionally, vendor SLA terms for the underlying infrastructure are absent, making it impossible to validate the contractual achievability of the stated latency and consistency acceptance criteria. Audit logging obligations for personal data access are also unaddressed. The project must resolve all blocking items — cost ceiling, egress model, cost estimate, residency controls, and transfer mechanism documentation — and address high-severity items before resubmitting to this gate."
+        }
+      ],
+      "outcome": "blocked"
+    }
+  ],
+  "final_outcome": "blocked",
+  "usage": [
+    {
+      "prompt_tokens": 977,
+      "completion_tokens": 1053,
+      "latency_ms": 21218,
+      "cost_usd": 0.018726,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 975,
+      "completion_tokens": 1259,
+      "latency_ms": 23010,
+      "cost_usd": 0.02181,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 977,
+      "completion_tokens": 1177,
+      "latency_ms": 21852,
+      "cost_usd": 0.020586,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 974,
+      "completion_tokens": 1099,
+      "latency_ms": 21563,
+      "cost_usd": 0.019407,
+      "model": "claude-sonnet-4-6"
+    }
+  ],
+  "schema_failures": 0
+}

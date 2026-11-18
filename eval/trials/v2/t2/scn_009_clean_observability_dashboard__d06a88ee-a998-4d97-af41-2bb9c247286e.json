@@ -1,0 +1,292 @@
+{
+  "scenario_id": "scn_009_clean_observability_dashboard",
+  "run_id": "d06a88ee-a998-4d97-af41-2bb9c247286e",
+  "started_at": "2026-11-18T20:30:45.301830Z",
+  "finished_at": "2026-11-18T20:31:05.941365Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "medium",
+              "concern_text": "The criterion 'Covers 100% of pipeline stages currently emitting metrics' is ambiguous. There is no documented baseline count of pipeline stages, no definition of what 'covered' means (visible in dashboard vs. alertable vs. queryable), and no test procedure to verify completeness. This cannot be objectively verified at acceptance.",
+              "references": [
+                "acceptance_criteria[1]",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "high",
+              "concern_text": "There is no business-level success metric defined. Acceptance criteria describe functional properties (render speed, coverage, SSO access) but do not answer whether the dashboard actually reduces MTTR, improves ops team response time, or any other outcome that justifies the investment. Without this, the project cannot be evaluated as a success post-launch.",
+              "references": [
+                "design_doc_v1",
+                "acceptance_criteria"
+              ]
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "A license quote artifact is listed but no cost estimate or cost ceiling appears in the project state. It is unclear whether the license quote has been approved, whether infrastructure hosting costs are included, or whether total cost of ownership has been evaluated at this gate.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "low",
+              "concern_text": "If the dashboard tooling autoscales query compute or ingestion (common in observability platforms), there is no documented maximum spend cap. As pipeline metric volume grows, costs could scale unboundedly without a ceiling control.",
+              "references": [
+                "design_doc_v1",
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "medium",
+              "concern_text": "No rollback or rollforward plan is documented in the design artifacts. If the dashboard deployment disrupts existing metrics pipelines or SSO integration, there is no defined procedure to revert safely.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "The project is scoped reasonably for a single feature area (observability dashboard) and two of the three acceptance criteria are testable (3-second render time, SSO access). However, the coverage criterion is too vague to pass as written, and critically there is no outcome-oriented success metric tied to operational improvement. A license quote exists but no approved cost estimate or ceiling is documented. The rollback plan is absent. I am approving with conditions: the team must (1) define a measurable baseline pipeline stage count and a testable definition of 'covered', (2) add at least one business outcome metric (e.g., MTTR reduction target or ops alert acknowledgement time), (3) confirm cost estimate approval and document a spend ceiling, and (4) document a rollback procedure before proceeding to the build gate."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_timeout",
+              "severity": "high",
+              "concern_text": "The design doc does not specify timeout configurations for synchronous calls from the dashboard backend to the pipeline metrics sources. Without timeouts, a slow or unresponsive upstream can stall dashboard rendering and violate the 3-second render acceptance criterion.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_circuit_breaker",
+              "severity": "high",
+              "concern_text": "No circuit breaker or fallback pattern is documented for dependencies on pipeline metric emitters. If a pipeline stage's metrics endpoint becomes unavailable, the dashboard should degrade gracefully (e.g., show stale data) rather than fail entirely. This is a critical operational gap.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_single_point_of_failure",
+              "severity": "medium",
+              "concern_text": "The design does not address redundancy for the metrics aggregation layer. If this is a single instance with no HA configuration, the dashboard becomes a single point of failure for ops visibility into the settlement pipeline.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "medium",
+              "concern_text": "No rollback procedure is documented in the design artifacts. If the dashboard deployment breaks existing SSO integration or metric collection, there is no documented path to revert.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "A license quote artifact is present, implying a third-party visualization or metrics vendor is in scope. No vendor SLA terms are referenced in the design doc. SLA availability from the vendor must be assessed against the dashboard reliability expectations.",
+              "references": [
+                "design_doc_v1",
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "low",
+              "concern_text": "If the dashboard backend autoscales based on query load (e.g., multiple ops users querying simultaneously), there is no documented compute or storage cost ceiling. This should be bounded before moving to implementation.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "low",
+              "concern_text": "The design does not mention audit logging for dashboard access. Given this surfaces settlement pipeline data, access by ops users should be logged for traceability, especially if sensitive financial metrics are exposed.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "The design is directionally sound—acceptance criteria are measurable, SSO integration is called out, and coverage of pipeline stages is scoped to known metric emitters. However, several reliability and operational maturity gaps must be resolved before implementation begins. Most critically, the absence of timeout and circuit breaker specifications for upstream metric source calls risks violating the 3-second render SLA and creating cascading failure modes. Single-instance deployment without HA documentation is a concern for ops-critical visibility tooling. The vendor SLA gap from the license quote must be closed to validate the composite reliability posture. These are conditions that should be addressed in a design doc revision before the build gate is opened."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "high",
+              "concern_text": "Settlement pipeline metrics may include transaction identifiers, account numbers, or other financial PII. The design doc and metrics inventory do not explicitly describe redaction or masking of PII before ingestion into the dashboard or its backing log/metric stores. This must be addressed before go-live.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "The design artifacts contain no mention of audit logging for security-sensitive dashboard actions such as privileged data access, filter changes, or export operations. Given this is a financial settlement pipeline, audit trails are essential for regulatory and incident response purposes.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "A settlement pipeline by nature is highly likely to be in or adjacent to PCI-DSS scope (card transaction data, authorization codes, etc.). Neither the design doc nor the metrics inventory includes a PCI scope assessment or carve-out confirming the dashboard is out of scope. This must be formally assessed before proceeding.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "high",
+              "concern_text": "The design documentation does not specify encryption-at-rest for the metrics store, time-series database, or any caching layer backing the dashboard. Settlement data is sensitive financial data and must be encrypted at rest with documented key management.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "The acceptance criteria indicate the ops team will access the dashboard via existing SSO, but there is no mention of role-based access control (RBAC), least-privilege IAM roles, or separation between read-only ops access and admin/configuration access. Overbroad access to settlement metrics poses insider-threat risk.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "medium",
+              "concern_text": "The design artifacts do not define a retention policy for dashboard access logs, query logs, or the underlying metrics data. Regulatory requirements (e.g., PCI-DSS requires 1-year log retention, 3 months immediately accessible) must be addressed explicitly.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "medium",
+              "concern_text": "If EU customer settlement data flows into the observability metrics (e.g., EU transaction counts, error rates tied to EU user segments), the design does not document data residency controls or confirm that metrics data remains within the EU or is appropriately de-identified before replication.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            }
+          ],
+          "reasoning": "The Settlement Pipeline Observability Dashboard operates on data from a financial settlement pipeline, which introduces significant security and privacy exposure. The most critical gap is the absence of a PCI-DSS scope review — this is a blocking concern because dashboards surfacing settlement pipeline metrics may inherently fall within PCI scope unless explicitly assessed and carved out. Beyond PCI, the design artifacts lack specificity on: (1) PII redaction in metrics/logs (transaction IDs, account references may appear in pipeline metrics), (2) audit logging for dashboard access and sensitive query operations, (3) encryption-at-rest guarantees for the metrics store, (4) RBAC/least-privilege IAM controls layered on top of SSO, (5) log and metrics retention policies aligned with regulatory requirements, and (6) GDPR data residency controls if EU transaction data surfaces in observability metrics. The team should produce a PCI scope assessment, an updated data classification for all ingested metrics, explicit encryption and key management documentation, RBAC design, and a retention policy before this design is approved to proceed to implementation."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "high",
+              "concern_text": "The design artifacts include a license_quote but no overall cost estimate covering compute, storage, and observability ingestion costs. Without a full cost estimate, it is impossible to validate unit economics or set a budget baseline at the design gate.",
+              "references": [
+                "design_doc_v1",
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "high",
+              "concern_text": "There is no documented maximum cost cap or autoscaling ceiling for the dashboard infrastructure (e.g., metrics ingestion, data retention, query compute). Observability platforms can generate unbounded costs if ingestion volume spikes unexpectedly with no guardrails.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "The license_quote references a vendor component, but there is no evidence that vendor SLA terms (uptime, support response, data availability guarantees) have been reviewed or attached to the design. For a production observability dashboard supporting settlement pipelines, vendor SLA gaps could affect operational commitments.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "medium",
+              "concern_text": "The metrics_inventory covers 100% of pipeline stages but does not document whether any metrics sources span multiple regions. If cross-region metric scraping or log forwarding is involved, egress costs could be material and must be modeled before approval.",
+              "references": [
+                "metrics_inventory",
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "high",
+              "concern_text": "This is a Settlement Pipeline dashboard. Settlement data frequently falls within PCI DSS scope. There is no evidence of a PCI scope review or determination that the dashboard does not render, store, or transmit cardholder data. This must be explicitly documented before proceeding.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "medium",
+              "concern_text": "The design does not address audit logging for dashboard access. Given the financial sensitivity of settlement pipeline data, access to metrics and dashboards by ops team members should be audit-logged to satisfy compliance and internal control requirements.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "The Settlement Pipeline Observability Dashboard presents several FinOps and legal concerns that must be resolved before full approval. Most critically, the design lacks a full cost estimate beyond the license quote, has no cost ceiling on ingestion or compute, and does not document vendor SLA terms tied to the quoted license. Given the settlement pipeline context, the absence of a PCI scope determination is a blocking risk that must be addressed—even if the conclusion is that no cardholder data is in scope, that determination needs to be documented. Additionally, potential cross-region metric flows have no egress cost model, and there is no audit trail planned for ops team dashboard access. The project can proceed to the next stage once: (1) a complete cost estimate with ceiling is submitted, (2) vendor SLA terms are attached and reviewed, (3) a PCI scope determination is documented, (4) egress costs are modeled or ruled out, and (5) an audit logging plan for dashboard access is added to the design."
+        }
+      ],
+      "outcome": "approved_with_conditions"
+    }
+  ],
+  "final_outcome": "approved_with_conditions",
+  "usage": [
+    {
+      "prompt_tokens": 2028,
+      "completion_tokens": 666,
+      "latency_ms": 16001,
+      "cost_usd": 0.016074,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 2026,
+      "completion_tokens": 738,
+      "latency_ms": 15331,
+      "cost_usd": 0.017148,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 2028,
+      "completion_tokens": 930,
+      "latency_ms": 20577,
+      "cost_usd": 0.020034,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 2025,
+      "completion_tokens": 784,
+      "latency_ms": 17505,
+      "cost_usd": 0.017835,
+      "model": "claude-sonnet-4-6"
+    }
+  ],
+  "schema_failures": 0,
+  "schema_failure_causes": []
+}
