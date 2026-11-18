@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(/.env)",
+      "Read(/.env.*)",
+      "Edit(/eval/scenarios/**)",
+      "Edit(/eval/defect_catalog.yaml)",
+      "Edit(/eval/judges/judge_validation/human_labels.csv)",
+      "Edit(/eval/judges/judge_validation/sample_key.json)",
+      "Edit(/eval/runs/**)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "grep -q '\"stop_hook_active\": *true' && exit 0; cd \"$CLAUDE_PROJECT_DIR\" && python -m pytest -q 1>&2 || exit 2",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

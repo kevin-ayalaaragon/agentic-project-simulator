@@ -1,11 +1,11 @@
 """run_scenario.py — Phase 1 runner.
 
-Loads a YAML scenario, runs each stakeholder agent at the scenario's current
-gate, parses responses through Pydantic with one retry, aggregates into a
-ScenarioRun, writes the result as JSON.
+Loads a YAML scenario, runs the stakeholder agents concurrently at the
+scenario's current gate, aggregates into a ScenarioRun, writes the result as JSON.
 
-Baseline (V1): raw JSON-in-prompt, no tool use, no retrieval. This is
-intentionally weak so Phase 2/3 optimizations have measurable impact.
+V2: grammar-constrained structured outputs (output_config json_schema) narrowed
+to catalog defect IDs; one retry, with each failed attempt recorded by cause.
+V1 results (JSON-in-prompt) remain in eval/runs/ for comparison.
 
 Usage:
     export ANTHROPIC_API_KEY=sk-ant-...
@@ -26,9 +26,13 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from concurrent.futures import ThreadPoolExecutor
+from enum import Enum
+from typing import Literal
+
 import yaml
-from anthropic import Anthropic
-from pydantic import ValidationError
+from anthropic import Anthropic, transform_schema
+from pydantic import Field, ValidationError, create_model
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -39,6 +43,7 @@ from core_engine.schemas import (
     GateDecision,
     GateOutcome,
     GateResult,
+    RaisedConcern,
     Scenario,
     ScenarioRun,
     TokenUsage,
@@ -106,74 +111,87 @@ PROJECT STATE:
 {json.dumps(project_dict, indent=2)}
 
 KNOWN DEFECT CATALOG (use these IDs if a concern matches one; otherwise set defect_id to null):
-{catalog_lines or "  (catalog empty)"}
+{catalog_lines or "  (catalog empty)"}"""
 
-Return a JSON object with this exact shape:
-{{
-  "agent": "{agent.value}",
-  "gate": "{scenario.project_state.stage.value}",
-  "decision": "approve" | "block" | "approve_with_conditions",
-  "concerns": [
-    {{
-      "defect_id": "<catalog id or null>",
-      "severity": "low" | "medium" | "high" | "blocking",
-      "concern_text": "<10 to 600 chars>",
-      "references": []
-    }}
-  ],
-  "reasoning": "<20 to 1500 chars summarizing your overall assessment>"
-}}
 
-Return ONLY the JSON object. No prose, no markdown fences."""
+# --- Output schema --------------------------------------------------------- #
+
+def build_output_model(agent: AgentRole, gate: str, catalog: list[dict]) -> type[AgentResponse]:
+    """Narrow AgentResponse so the decoding grammar admits only this agent, this gate,
+    and catalog defect IDs.
+
+    Every field is required because structured outputs emit required properties
+    before optional ones; this keeps concerns before reasoning and defect_id first
+    in each concern, matching the declared order.
+    """
+    defect_ids = Enum("DefectId", {d["id"]: d["id"] for d in catalog}, type=str)
+    concern = create_model(
+        "CatalogConcern",
+        __base__=RaisedConcern,
+        defect_id=(defect_ids | None, ...),
+        references=(list[str], ...),
+    )
+    return create_model(
+        "CatalogAgentResponse",
+        __base__=AgentResponse,
+        agent=(Literal[agent.value], ...),
+        gate=(Literal[gate], ...),
+        concerns=(list[concern], ...),
+    )
+
+
+def _lowercase_enums(data: dict) -> dict:
+    """Structured outputs do not guarantee enum casing; every enum value here is lowercase."""
+    for key in ("agent", "gate", "decision"):
+        if isinstance(data.get(key), str):
+            data[key] = data[key].lower()
+    for concern in data.get("concerns", []):
+        for key in ("severity", "defect_id"):
+            if isinstance(concern.get(key), str):
+                concern[key] = concern[key].lower()
+    return data
 
 
 # --- Single agent call ----------------------------------------------------- #
-
-def _strip_fences(text: str) -> str:
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.strip("`")
-        if text.startswith("json"):
-            text = text[4:]
-    return text.strip()
-
 
 def call_agent(
     client: Anthropic,
     agent: AgentRole,
     scenario: Scenario,
     catalog: list[dict],
-) -> tuple[AgentResponse | None, TokenUsage, int]:
-    """Run one agent. Returns (response or None on hard failure, usage, schema_failure_count)."""
+) -> tuple[AgentResponse | None, TokenUsage, list[str]]:
+    """Run one agent. Returns (response or None on hard failure, usage, failure causes)."""
     system_prompt = AGENT_PERSONAS[agent]
     user_prompt = build_user_prompt(scenario, agent, catalog)
-    schema_failures = 0
+    output_model = build_output_model(agent, scenario.project_state.stage.value, catalog)
+    output_config = {"format": {"type": "json_schema", "schema": transform_schema(output_model)}}
+    failure_causes: list[str] = []
     response: AgentResponse | None = None
     totals = {"in": 0, "out": 0, "latency_ms": 0}
 
-    for attempt in range(2):
+    for _ in range(2):
         start = time.perf_counter()
         api_response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
+            output_config=output_config,
         )
         totals["latency_ms"] += int((time.perf_counter() - start) * 1000)
         totals["in"] += api_response.usage.input_tokens
         totals["out"] += api_response.usage.output_tokens
 
-        raw = _strip_fences(api_response.content[0].text)
+        if api_response.stop_reason in ("refusal", "max_tokens"):
+            failure_causes.append(api_response.stop_reason)
+            continue
         try:
-            response = AgentResponse.model_validate(json.loads(raw))
+            data = _lowercase_enums(json.loads(api_response.content[0].text))
+            parsed = output_model.model_validate(data)
+            response = AgentResponse.model_validate(parsed.model_dump(mode="json"))
             break
         except (json.JSONDecodeError, ValidationError):
-            schema_failures += 1
-            if attempt == 0:
-                user_prompt += (
-                    "\n\nYour previous response was not valid JSON or did not match the "
-                    "schema. Return ONLY a valid JSON object exactly matching the schema above."
-                )
+            failure_causes.append("validation")
 
     cost = (
         totals["in"] * INPUT_PRICE_PER_MTOK / 1_000_000
@@ -186,7 +204,7 @@ def call_agent(
         cost_usd=round(cost, 6),
         model=MODEL,
     )
-    return response, usage, schema_failures
+    return response, usage, failure_causes
 
 
 # --- Gate aggregation ------------------------------------------------------ #
@@ -212,12 +230,15 @@ def run_scenario(scenario_path: Path, output_dir: Path) -> ScenarioRun:
     started_at = datetime.now(timezone.utc)
     responses: list[AgentResponse] = []
     usages: list[TokenUsage] = []
-    schema_failures_total = 0
+    failure_causes: list[str] = []
 
-    for agent in AgentRole:
-        response, usage, failures = call_agent(client, agent, scenario, catalog)
+    # Sectioning: the four role reviews are independent, so they run concurrently.
+    with ThreadPoolExecutor(max_workers=len(AgentRole)) as pool:
+        results = list(pool.map(lambda a: (a, *call_agent(client, a, scenario, catalog)), AgentRole))
+
+    for agent, response, usage, causes in results:
         usages.append(usage)
-        schema_failures_total += failures
+        failure_causes.extend(causes)
         if response is not None:
             responses.append(response)
         else:
@@ -240,7 +261,8 @@ def run_scenario(scenario_path: Path, output_dir: Path) -> ScenarioRun:
         gate_results=[gate_result],
         final_outcome=outcome,
         usage=usages,
-        schema_failures=schema_failures_total,
+        schema_failures=len(failure_causes),
+        schema_failure_causes=failure_causes,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)

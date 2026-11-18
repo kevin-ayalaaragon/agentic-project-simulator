@@ -199,6 +199,10 @@ class ScenarioRun(BaseModel):
         default=0,
         description="Count of agent calls whose raw output failed Pydantic parse, even after retry. Feeds L1.",
     )
+    schema_failure_causes: list[str] = Field(
+        default_factory=list,
+        description="One entry per failed attempt: refusal, max_tokens, or validation.",
+    )
 
 
 # --------------------------------------------------------------------------- #

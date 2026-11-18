@@ -24,6 +24,28 @@ The two recall numbers report the same underlying behavior at different measurem
 
 Strict precision is reported as a floor, not a truth. It treats every concern that does not match a seeded defect ID as a false positive. The L4 judge decomposes that floor: of the unmatched flags across the suite, 76% were judged as legitimate in-persona catches of gaps not seeded in ground truth, 17% as partially in-role, and 6% as persona drift. True noise is a small minority of what the strict number counts against the system.
 
+## V2 Results: Constrained Decoding
+
+V2 replaces JSON-in-prompt with grammar-constrained structured outputs. The API compiles the Pydantic schema into the decoding grammar, narrowed per call to the calling role, the gate, and the 29-ID defect catalog, so an agent cannot emit a defect ID outside the catalog. Role reviews run concurrently (sectioning) and aggregate through the unchanged deterministic gate rule. Each configuration ran 3 trials of the 10 scenarios. Recall differences are paired by scenario and bootstrapped over the 7 scenarios that seed defects, since trials of one scenario are not independent.
+
+| Metric | V1 (JSON in prompt) | V2 initial | V2 final (all fields required) |
+|--------|---------------------|------------|--------------------------------|
+| Format pass rate | 120/120 | 119/120 | 120/120 |
+| Failed attempts (retries) | 4 | 4 (3 validation, 1 max_tokens) | 0 |
+| Tagged recall, mean of 3 trials (SD) | 0.95 (0.04) | 0.81 (0.05) | 0.91 (0.05) |
+| Recall change vs V1, paired by scenario [95% CI] | n/a | -0.14 [-0.40, +0.04] | -0.04 [-0.12, +0.05] |
+| Seeded defects caught in all 3 trials | 14/16 | 11/16 | 12/16 |
+| Strict precision | 0.11 to 0.12 | 0.10 to 0.11 | 0.10 to 0.11 |
+| Gate outcome matches expected | 21/30 | 21/30 | 21/30 |
+| Wall time per scenario (approx.) | 92 s, sequential | 23 s, parallel | 21 s, parallel |
+| Cost per scenario | $0.079 | $0.073 | $0.074 |
+
+**The harness caught a regression.** The initial V2 missed both seeded defects in `scn_007` in all three trials (V1 caught 5 of 6) and raised 26% fewer concerns per run. Structured outputs emit required properties before optional ones. Because `concerns` was optional, the model wrote its decision and summary reasoning before listing concerns, the reverse of V1's order. Making every field required restored concern-first order: `scn_007` recovered in 2 of 3 trials, and suite recall moved to within 0.04 of V1, an interval that includes no change.
+
+**Limits of the comparison.** Seven scenarios with seeded defects is a small sample, so the intervals are wide and only large effects are detectable. V2 final versus V1 is consistent with parity, not proof of it. Enum casing is normalized before scoring, and a wrong-but-valid catalog ID remains possible; strict precision measures that.
+
+**Eval integrity.** Claude Code permission deny rules block the coding agent's edit tools from modifying the answer key (scenarios, defect catalog, human labels, V1 runs), a guard against the test tampering documented in coding agents. A Stop hook runs the offline contract tests and keeps a turn from ending while they fail, and CI runs the same tests with read-only permissions and no secrets. All 90 run files behind this table are in `eval/trials/`.
+
 ## Architecture
 
 The system has two layers: the simulator (which runs scenarios) and the evaluation harness (which measures the simulator). The harness is organized into three communication pillars over five engineering layers.
@@ -45,7 +67,7 @@ A few design decisions matter more than the numbers themselves, and are worth un
 
 **Closed-enum schemas.** Every choice the model can make at a structural decision point (agent role, gate stage, severity, decision verdict, persona verdict) is a Python enum with `extra="forbid"` enforcement. Without this, hallucinated field values silently pass validation and the L1 metric becomes meaningless. Schema rigor is what makes L1 measure anything at all.
 
-**The defect catalog is vocabulary, not an answer key.** Agents are shown a catalog of 28 canonical defect IDs and asked to tag their concerns with the matching ID when applicable. Any single scenario seeds 0 to 3 defects from that catalog, so the agent receives a vocabulary rather than the list of correct answers. This is what makes L2 scoring deterministic without relying on fuzzy text matching between agent prose and seeded-defect descriptions.
+**The defect catalog is vocabulary, not an answer key.** Agents are shown a catalog of 29 canonical defect IDs and asked to tag their concerns with the matching ID when applicable. Any single scenario seeds 0 to 3 defects from that catalog, so the agent receives a vocabulary rather than the list of correct answers. This is what makes L2 scoring deterministic without relying on fuzzy text matching between agent prose and seeded-defect descriptions.
 
 **Strict precision is the floor.** Every concern that does not match a seeded defect ID is counted as a false positive by the strict scorer. In practice these unmatched concerns fall into three categories: real-but-unseeded catches, persona drift (an agent flagging something outside its role), and true noise. The triage workflow distinguishes them by asking three questions of each: does the project state actually support the concern, is the concern in the agent's domain, and is the concern a defect or a wish. The result of triage is a precision number meaningfully higher than the strict floor.
 
@@ -73,7 +95,7 @@ The V1 baseline establishes specific failure modes that V2 is designed to addres
 ├── core_engine/
 │   └── schemas.py              # Pydantic models shared by the simulator and harness
 ├── eval/
-│   ├── defect_catalog.yaml     # 28 canonical defect IDs
+│   ├── defect_catalog.yaml     # 29 canonical defect IDs
 │   ├── scenarios/              # 10 YAML test fixtures
 │   ├── runners/
 │   │   └── run_scenario.py     # Executes one scenario through the agent system

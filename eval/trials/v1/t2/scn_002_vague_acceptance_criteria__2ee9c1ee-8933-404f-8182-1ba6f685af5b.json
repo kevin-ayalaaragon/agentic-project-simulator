@@ -1,0 +1,246 @@
+{
+  "scenario_id": "scn_002_vague_acceptance_criteria",
+  "run_id": "2ee9c1ee-8933-404f-8182-1ba6f685af5b",
+  "started_at": "2026-11-18T19:32:44.328939Z",
+  "finished_at": "2026-11-18T19:33:50.250553Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "'Customers love the new checkout' is not a testable criterion. It lacks a numeric threshold, measurement method, and timeframe. Replace with something like: NPS score >= X, or CSAT >= Y% within 30 days of launch.",
+              "references": []
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "'Conversion improves significantly' is not measurable. Define a specific baseline conversion rate, a target lift percentage (e.g., +5% checkout completion rate), a measurement window, and a statistical confidence level required.",
+              "references": []
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "'Page feels fast' is not a testable acceptance criterion. Define concrete performance targets such as LCP <= 2.5s, TTI <= 3.5s, or p95 server response time <= 500ms, measured under defined load conditions.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "high",
+              "concern_text": "No measurable success metrics are defined anywhere in the project artifacts. All three acceptance criteria are qualitative. This project cannot be evaluated as a success or failure at any future gate without numeric baselines and targets established now.",
+              "references": [
+                "prd_v2"
+              ]
+            }
+          ],
+          "reasoning": "All three acceptance criteria are qualitative and untestable as written. 'Customers love,' 'improves significantly,' and 'feels fast' provide zero basis for a go/no-go decision at launch, cannot be tracked during the release, and cannot be evaluated in a post-launch review. This is a blocking issue because the project has no mechanism to determine whether it succeeded. The PRD (prd_v2) must be revised before this project proceeds past the design gate. Each criterion needs: a numeric threshold, a defined measurement method, a data source, and a time window for evaluation. Additionally, baselines for conversion rate and page performance must be established now so post-launch delta can be calculated. I am blocking this gate until measurable, testable acceptance criteria are documented."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "All three acceptance criteria lack numeric thresholds: 'customers love', 'improves significantly', and 'feels fast' are unmeasurable. These must be replaced with specific, testable metrics (e.g., conversion rate delta %, p95 LCP < X ms, NPS delta) before any design can be validated against them.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "blocking",
+              "concern_text": "No quantitative success metric is defined. Without a baseline conversion rate and a target delta, it is impossible to determine if the project succeeded or to make data-driven rollback decisions post-release.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "high",
+              "concern_text": "Checkout improvements touch payment flows, yet there is no evidence of a PCI DSS scope assessment in the artifacts. Any change to checkout must document whether card data handling is in scope and what controls apply.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "high",
+              "concern_text": "No rollback procedure is documented. Checkout is a revenue-critical path; a phased rollout and feature-flag-based rollback plan must be defined before the design gate closes.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_scope_too_broad",
+              "severity": "medium",
+              "concern_text": "The project name 'Checkout Improvements Q1' is broad and the single gate bundles conversion, performance, and UX concerns. Consider splitting into independently releasable increments to reduce blast radius and improve reviewability.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_timeout",
+              "severity": "medium",
+              "concern_text": "Design artifacts reference no timeout configuration for synchronous checkout dependencies (payment gateway, inventory, fraud checks). All critical-path synchronous calls must have explicit timeout budgets documented in the design.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_circuit_breaker",
+              "severity": "medium",
+              "concern_text": "No circuit breaker or graceful degradation strategy is described for checkout dependencies. If a downstream service (e.g., payment processor) degrades, the checkout flow must have a documented fallback to avoid full outage.",
+              "references": [
+                "prd_v2"
+              ]
+            }
+          ],
+          "reasoning": "The design gate cannot be approved in its current state. The most critical issue is that all acceptance criteria are qualitative and unmeasurable, which means the project cannot be objectively validated at any subsequent gate or post-release review. This alone is a blocking condition. Additionally, there is no documented success metric with a baseline and target, no rollback plan for a revenue-critical flow, and no PCI scope assessment despite this being a checkout project touching payment data. On the reliability side, the design is silent on timeouts and circuit breakers for synchronous dependencies, which are table-stakes for a checkout critical path. The project scope also appears broad for a single gate, increasing coordination and rollback risk. The team should: (1) rewrite acceptance criteria with numeric thresholds, (2) complete a PCI scope assessment, (3) document a rollback and feature-flag strategy, (4) specify timeout budgets and circuit breaker patterns for all external dependencies, and (5) consider decomposing scope into smaller, independently shippable increments. Resubmit with updated design artifacts addressing these before proceeding."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "The project is 'Checkout Improvements' and no PCI-DSS scope assessment is documented. Any service touching card data at checkout must have a formal PCI scope review before design is approved.",
+              "references": []
+            },
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "high",
+              "concern_text": "PRD does not specify log redaction requirements for checkout PII (name, address, email, partial card). Without explicit controls, PII leakage into logs is likely during implementation.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "No mention of audit logging for security-sensitive checkout actions such as payment submission, address changes, or coupon application. These events must be audit-logged for fraud investigation and compliance.",
+              "references": []
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "high",
+              "concern_text": "Design artifacts contain no data residency controls or documentation. If EU customers are in scope, storage and processing locations for PII and payment data must be explicitly defined and constrained.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_transfer_mechanism",
+              "severity": "high",
+              "concern_text": "No documented legal mechanism (SCCs, adequacy decision) for any cross-border transfer of checkout PII or payment data. This is required under GDPR before data flows are designed in.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "high",
+              "concern_text": "PRD does not specify encryption-at-rest requirements for any checkout data stores that may persist PII or tokenized payment data. Encryption posture must be defined at design time.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "medium",
+              "concern_text": "No log retention policy defined for checkout service logs. GDPR requires that logs containing PII are not retained longer than necessary; a retention period must be set.",
+              "references": []
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "Design does not define IAM roles or least-privilege access for checkout service components. Overbroad permissions on payment-adjacent services represent significant risk.",
+              "references": []
+            }
+          ],
+          "reasoning": "This checkout project has multiple blocking and high-severity security and privacy gaps at the design stage. Most critically, there is no PCI-DSS scope assessment despite the project directly touching payment checkout flows — this alone is a blocker. The PRD also lacks controls for PII handling in logs, audit logging of sensitive actions, encryption at rest for data stores, GDPR data residency constraints, and legal transfer mechanisms for cross-border data flows. IAM access design and log retention policies are also absent. These are foundational security and privacy architecture decisions that must be resolved in the design before implementation begins. Approving this gate without these controls documented would create significant regulatory and security risk. The project must be returned for a revised PRD that addresses PCI scoping, GDPR compliance posture, encryption requirements, audit logging design, and IAM least-privilege definitions."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "All three acceptance criteria ('customers love', 'improves significantly', 'feels fast') lack numeric thresholds or testable definitions. These cannot be evaluated at any gate or audit. Minimum requirement: define specific conversion rate delta, p95 page load target in milliseconds, and a measurable CSAT or NPS baseline.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "high",
+              "concern_text": "No cost estimate is present in the project artifacts for the design gate. Checkout is a high-traffic critical path; compute, payment processor fees, and any third-party enrichment costs must be estimated before proceeding.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "high",
+              "concern_text": "No autoscaling cap or cost ceiling is documented. Checkout traffic spikes can cause unbounded compute spend. A maximum spend ceiling or instance cap must be defined to prevent runaway cost exposure.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "high",
+              "concern_text": "The PRD references checkout improvements but does not document SLA terms for any third-party payment or fraud-screening vendors in scope. Without documented SLAs, composite availability targets and contractual remedies are unknown.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "Checkout changes touch card data flows. No PCI DSS scope assessment or SAQ/QSA review is referenced in the design artifacts. Any change to checkout must include a documented PCI scope impact review before gate passage.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "high",
+              "concern_text": "There is no measurable success metric defined. 'Conversion improves significantly' is not a metric. A baseline conversion rate, target lift percentage, measurement window, and statistical significance threshold are required.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "medium",
+              "concern_text": "If checkout improvements involve cross-region redundancy or data replication for resilience, no egress cost model is present. This must be assessed if multi-region deployment is planned.",
+              "references": []
+            }
+          ],
+          "reasoning": "This project cannot pass the design gate in its current state due to two blocking issues and multiple high-severity gaps. First, all acceptance criteria are unmeasurable, which is a foundational problem: there is no way to determine gate passage at any subsequent review, and any contractual or regulatory audit of outcomes would fail. Second, a PCI scope review is absent for a project that explicitly touches the checkout flow, which handles card data. This is a compliance requirement, not an engineering preference. Additionally, no cost estimate exists, no autoscaling ceiling is defined (creating unbounded spend exposure), and third-party vendor SLAs are undocumented, leaving composite availability and contractual remedies unquantifiable. The project must return with: (1) numeric acceptance criteria for conversion, performance, and satisfaction; (2) a documented PCI scope impact assessment; (3) a cost estimate with spend ceiling; (4) vendor SLA documentation for all payment and fraud-screening providers. The FinOps and Legal review will re-evaluate once these artifacts are present."
+        }
+      ],
+      "outcome": "blocked"
+    }
+  ],
+  "final_outcome": "blocked",
+  "usage": [
+    {
+      "prompt_tokens": 977,
+      "completion_tokens": 603,
+      "latency_ms": 12230,
+      "cost_usd": 0.011976,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 975,
+      "completion_tokens": 963,
+      "latency_ms": 18532,
+      "cost_usd": 0.01737,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 977,
+      "completion_tokens": 895,
+      "latency_ms": 16242,
+      "cost_usd": 0.016356,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 974,
+      "completion_tokens": 924,
+      "latency_ms": 18914,
+      "cost_usd": 0.016782,
+      "model": "claude-sonnet-4-6"
+    }
+  ],
+  "schema_failures": 0
+}

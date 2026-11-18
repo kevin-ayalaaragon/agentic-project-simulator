@@ -1,0 +1,217 @@
+{
+  "scenario_id": "scn_010_clean_db_index_addition",
+  "run_id": "882312fd-d9b7-4ab2-830f-ba98592d9b34",
+  "started_at": "2026-06-08T16:26:55.173057Z",
+  "finished_at": "2026-06-08T16:28:02.783488Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "No cost estimate is present in the artifacts for storage overhead or index build compute costs. The acceptance criterion caps storage at 8% of table size, but there is no dollar figure attached to that overhead or to any compute costs for the build process. This must be documented before production deployment.",
+              "references": []
+            },
+            {
+              "defect_id": null,
+              "severity": "medium",
+              "concern_text": "The acceptance criteria do not specify how or when p99 will be measured post-deployment (e.g., measurement window, traffic volume, specific query set). Without a defined measurement protocol, it will be ambiguous whether the 100ms target has been met. Add a testable measurement plan to the success criteria.",
+              "references": [
+                "query_performance_analysis"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "low",
+              "concern_text": "The zero-downtime index build criterion lacks a definition of 'downtime.' Clarify whether this means zero replication lag spikes, zero query errors, zero degradation above a threshold, or something else. This is needed to make the criterion unambiguously testable at release.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "low",
+              "concern_text": "The rollback plan artifact is listed but no summary of its trigger conditions or RTO target is visible in the project state. Confirm the rollback plan specifies who authorizes rollback, under what observable conditions, and the expected recovery time.",
+              "references": [
+                "rollback_plan"
+              ]
+            }
+          ],
+          "reasoning": "The project is well-scoped with a single clear technical objective and three quantified acceptance criteria, which is a strong foundation. The p99 latency target (800ms to under 100ms), zero-downtime constraint, and storage cap are all numeric and directionally testable. However, four gaps need resolution before this can be fully approved. First, there is no cost estimate for storage or compute associated with the index build, which is required at this gate. Second, the measurement protocol for p99 validation is undefined—without specifying the query set, traffic conditions, and observation window, the criterion cannot be objectively evaluated post-release. Third, 'zero downtime' needs an operational definition to be enforceable. Fourth, the rollback plan needs confirmation that it includes trigger conditions and an RTO. None of these are blocking issues that indicate fundamental design flaws; they are documentation and specification gaps that should be closeable quickly. I recommend approving with conditions: cost estimate provided, measurement protocol documented, zero-downtime defined operationally, and rollback trigger/RTO confirmed before the build gate."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "medium",
+              "concern_text": "A rollback_plan artifact is listed but the design doc must explicitly reference it and confirm the rollback procedure has been tested or dry-run. Presence of the artifact alone does not confirm operational readiness.",
+              "references": [
+                "rollback_plan"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "high",
+              "concern_text": "The acceptance criterion 'index build completes with zero downtime' is not backed by a documented mechanism (e.g., CONCURRENTLY build on Postgres, online DDL on MySQL, shadow index strategy). The design doc must specify the exact DDL strategy and how it was validated to be non-blocking under production load levels.",
+              "references": [
+                "design_doc_v1",
+                "query_performance_analysis"
+              ]
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "medium",
+              "concern_text": "The 8% storage overhead criterion lacks a baseline table size and measurement methodology. Without a stated baseline (e.g., current table size in GB) and a defined measurement point (post-build, steady-state), this criterion cannot be objectively verified at release.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "medium",
+              "concern_text": "The query_performance_analysis should confirm that the p99 target of sub-100ms was validated against production-representative data distribution and cardinality, not just synthetic test data. Index selectivity assumptions must be documented.",
+              "references": [
+                "query_performance_analysis"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "low",
+              "concern_text": "No mention of index maintenance overhead during high write throughput periods. The design should address write amplification impact and whether index creation or ongoing maintenance could cause lock contention or replication lag.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "low",
+              "concern_text": "If the transaction table contains financial or sensitive records, any schema change operation (DDL) should be captured in an audit log. Confirm DDL audit logging is enabled for the target database.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "The project has clear, numeric acceptance criteria and a rollback plan artifact present, which are positive signals. However, the design gate cannot fully approve without resolution of two key engineering risks: (1) the zero-downtime index build strategy is unspecified — concurrent/online index build mechanisms vary significantly by database engine and must be explicitly called out and validated under realistic write load, and (2) the storage overhead criterion lacks a testable baseline. The p99 target is well-defined but must be grounded in production-representative benchmarks rather than synthetic tests. Write amplification and lock/replication lag risks during index maintenance are minor but should be acknowledged. The rollback plan artifact needs an explicit linkage in the design doc with evidence of a dry-run or procedural review. These are resolvable conditions; the project should not be blocked outright, but approval is conditional on addressing the zero-downtime mechanism specification and the measurement baseline for storage overhead before build begins."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "The design document does not mention audit logging for DDL operations (index creation/drops) on the transaction table. Schema changes on tables containing financial transaction data are security-sensitive and must be captured in an immutable audit log with actor, timestamp, and operation details.",
+              "references": []
+            },
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "high",
+              "concern_text": "The query performance analysis artifact likely captures slow-query logs or EXPLAIN ANALYZE output. If the transaction table contains cardholder names, account numbers, or other PII, raw query samples or row data must be redacted before being written to any log store. No redaction controls are described in the design.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "The project targets a 'transaction table' but contains no mention of a PCI-DSS scope assessment. If this table stores or references card data (PANs, CVVs, expiry dates), the index build process, any temporary sort files, and index storage must all be evaluated for PCI scope. Missing this assessment is a blocking gap.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "high",
+              "concern_text": "New indexes on a transaction table may use temporary disk space and secondary index storage. The design does not confirm that both the index structures and any temporary build artifacts inherit or explicitly enable encryption at rest, especially for interim sort/merge files created during concurrent index builds.",
+              "references": []
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "No IAM or database role controls are described for who can execute the index DDL. The migration or automation account should hold only the minimum privilege needed (e.g., CREATE INDEX on the specific table) and not broader DBA or table-owner rights. Principle of least privilege must be documented.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "medium",
+              "concern_text": "Performance analysis and DDL execution logs generated during the index build have no described retention policy. For regulatory environments (GDPR, PCI-DSS), log retention windows must be explicitly defined and enforced to avoid both over-retention of personal data and under-retention of compliance evidence.",
+              "references": []
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "medium",
+              "concern_text": "If the transaction table contains EU data subjects' personal data, the design must confirm that index build operations, temporary tablespaces, and any read replicas used during performance testing do not replicate data outside the EU without documented residency controls.",
+              "references": []
+            }
+          ],
+          "reasoning": "The Transaction Table Index Optimization project presents several security and privacy gaps that must be addressed before proceeding. The most critical is the absence of any PCI-DSS scope review: a 'transaction table' is a high-probability location for card data, and no scoping statement exists in any artifact. This alone warrants a blocking concern. Beyond PCI, the design is silent on audit logging for DDL operations, encryption-at-rest guarantees for index storage and temporary build files, IAM least-privilege controls for the migration account, and redaction of any PII that may surface in slow-query or performance logs. GDPR data residency and log retention are medium-severity gaps but must be resolved given the regulatory exposure of financial data. The project may proceed to the next gate only after: (1) completing a PCI scope assessment and documenting outcomes, (2) confirming encryption at rest for all index and temp artifacts, (3) adding DDL audit logging with actor attribution, (4) defining IAM/role controls scoped to minimum privilege, (5) establishing log retention policies, and (6) confirming GDPR residency controls if EU personal data is present. The performance and rollback artifacts are otherwise well-structured from a functional standpoint."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "medium",
+              "concern_text": "The design doc does not specify a cost ceiling for index build compute resources. If the index build triggers autoscaling or consumes burst compute capacity, there is no documented maximum spend cap to prevent runaway costs during the build operation.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "No cost estimate is provided for the additional storage overhead (up to 8% of table size) or the index build I/O costs. At scale, persistent storage additions and I/O spikes during build can carry meaningful monthly cost implications that must be quantified before approval.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "low",
+              "concern_text": "If the transaction table is replicated across regions or the index build triggers cross-region replication sync, there is no egress cost model documented. This should be confirmed as in-region only or an egress estimate provided.",
+              "references": []
+            }
+          ],
+          "reasoning": "From a FinOps and Legal perspective, this project is narrowly scoped and operationally straightforward — a database index optimization with a defined rollback plan and clear storage threshold. There are no apparent PII, licensing, vendor SLA, or regulatory red flags surfaced in the artifacts. However, three cost-related gaps prevent a clean approval: (1) no documented compute cost ceiling for the index build phase, which could involve significant I/O and temporary resource scaling; (2) no quantified cost estimate for the persistent storage increase, which at large table sizes may be non-trivial on an ongoing basis; (3) no confirmation or model for cross-region replication egress costs if the table participates in a replication topology. These are addressable conditions rather than blockers. The project may proceed to the next gate once a cost estimate for storage delta and build compute is documented, a spend cap is defined for the build operation, and replication topology is confirmed as in-region or an egress model is provided."
+        }
+      ],
+      "outcome": "approved_with_conditions"
+    }
+  ],
+  "final_outcome": "approved_with_conditions",
+  "usage": [
+    {
+      "prompt_tokens": 1012,
+      "completion_tokens": 698,
+      "latency_ms": 15085,
+      "cost_usd": 0.013506,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 1010,
+      "completion_tokens": 846,
+      "latency_ms": 17939,
+      "cost_usd": 0.01572,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 1012,
+      "completion_tokens": 1059,
+      "latency_ms": 21623,
+      "cost_usd": 0.018921,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 1009,
+      "completion_tokens": 560,
+      "latency_ms": 12961,
+      "cost_usd": 0.011427,
+      "model": "claude-sonnet-4-6"
+    }
+  ],
+  "schema_failures": 0
+}

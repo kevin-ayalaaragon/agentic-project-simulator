@@ -1,0 +1,258 @@
+{
+  "scenario_id": "scn_008_clean_idempotency_key_rollout",
+  "run_id": "d1d8497f-2949-488a-ac44-25c99b3dde3f",
+  "started_at": "2026-11-18T20:02:45.716726Z",
+  "finished_at": "2026-11-18T20:04:07.087267Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "high",
+              "concern_text": "No rollback procedure is documented in the listed artifacts. If the idempotency key store becomes corrupted or the lookup latency spikes during rollout, there is no documented path to revert safely without risking duplicate refunds being processed.",
+              "references": []
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "medium",
+              "concern_text": "The acceptance criterion 'Zero increase in error rate during rollout' lacks a defined measurement window, baseline error rate, and statistical threshold. 'Zero increase' is not operationally testable without these parameters. Define a baseline error rate percentage, measurement window (e.g., 1-hour rolling), and acceptable confidence interval.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "medium",
+              "concern_text": "The acceptance criteria define technical health guards but no business success metric. There is no measure of duplicate refund rate reduction, customer support ticket deflection, or financial loss prevention. Without this, we cannot evaluate whether the feature delivered its intended value post-launch.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "low",
+              "concern_text": "A cost estimate exists, but it is unclear whether the idempotency key store (likely a cache or database) has a defined maximum scale cap. If refund volume spikes, unbounded storage growth could significantly exceed the estimate. Confirm a cost ceiling or TTL/eviction policy is in place for the 24-hour key window.",
+              "references": []
+            }
+          ],
+          "reasoning": "The project is well-scoped for a design gate: it addresses a single feature area (idempotency for refunds), has a security review signed off, and carries a cost estimate. Two of the three acceptance criteria are measurable and appropriate. However, the project is not ready to approve unconditionally. First, the absence of a rollback plan is a high-severity gap — refunds are financially sensitive and a corrupted key store could either block legitimate refunds or allow duplicates, both of which carry direct business harm. A documented rollback procedure is non-negotiable before build begins. Second, the 'zero increase in error rate' criterion needs a testable baseline and measurement window to be actionable in a go/no-go decision. Third, the project lacks any post-launch success metric tied to business outcomes, making it impossible to evaluate whether the feature actually solved the duplicate refund problem at scale. Finally, cost ceiling for the key store should be confirmed given the 24-hour retention window and variable refund volume. Conditions for approval: (1) document and review a rollback plan, (2) refine the error rate criterion with baseline and window, (3) add at least one measurable business success metric. These are addressable before the build gate without redesign."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_timeout",
+              "severity": "high",
+              "concern_text": "Design doc v2 does not specify timeout configuration for the idempotency key lookup (likely a cache or database read on the critical path). Without an explicit timeout, a slow backing store will block refund request processing, violating the p99 <5ms latency acceptance criterion and potentially causing cascading failures.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_circuit_breaker",
+              "severity": "high",
+              "concern_text": "No circuit breaker or fallback strategy is documented for the idempotency store dependency. If the store becomes unavailable, the refund endpoint must have a defined degradation path (e.g., fail-open with duplicate-risk logging, or fail-closed with clear 503). Neither option is specified, risking increased error rates during rollout.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "high",
+              "concern_text": "The artifacts list does not include a rollback procedure. Given that this feature modifies refund response behavior and introduces a new stateful store, a documented rollback plan is required before gate passage to satisfy the 'zero increase in error rate' acceptance criterion.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "medium",
+              "concern_text": "Idempotency key creation, lookup hits, and expiry events are security-sensitive operations (they determine whether a financial mutation executes). The design should confirm these events are audit-logged with actor, key hash, and outcome, separate from application logs.",
+              "references": [
+                "design_doc_v2",
+                "security_review_signoff"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "medium",
+              "concern_text": "The idempotency store will cache refund response payloads which may contain transaction IDs, amounts, and customer references. The design doc must explicitly confirm encryption at rest for this store; it is not called out in the security review signoff artifacts provided.",
+              "references": [
+                "design_doc_v2",
+                "security_review_signoff"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "low",
+              "concern_text": "Cost estimate is present but it is unclear whether the idempotency store (likely Redis or DynamoDB) has a maximum capacity or spend cap configured. High refund volumes or key accumulation over the 24h window could cause unbounded storage growth and cost spikes.",
+              "references": [
+                "cost_estimate"
+              ]
+            }
+          ],
+          "reasoning": "The project is well-scoped with clear numeric acceptance criteria and existing security signoff and cost estimate artifacts, which is a solid foundation. However, three high-severity engineering gaps prevent unconditional approval. First, no timeout is specified for the idempotency store lookup on the critical path, which directly threatens the p99 <5ms budget. Second, there is no circuit breaker or graceful degradation strategy documented for idempotency store unavailability, which threatens the zero-error-rate-increase criterion during rollout. Third, there is no documented rollback plan, which is a mandatory gate requirement for any change to financial mutation endpoints. These three items must be resolved before or at code review as conditions of approval. Additionally, medium-severity items around audit logging completeness and encryption-at-rest confirmation for the new store should be addressed in the implementation spec, and the cost ceiling question should be answered before launch. Overall the design is approvable once the critical reliability and rollback gaps are closed."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "high",
+              "concern_text": "Idempotency key lookups and refund responses may log customer identifiers, card-holder names, or partial card numbers. The design doc must explicitly mandate redaction of PII fields (e.g., masked account IDs, no raw card data) before any log emission.",
+              "references": [
+                "GDPR Art. 5(1)(f)",
+                "PCI-DSS Req. 3.3"
+              ]
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "medium",
+              "concern_text": "No retention policy is defined for idempotency key store audit logs or application logs. A defined retention window is required for GDPR compliance and PCI-DSS audit trail requirements. Recommend 90-day hot retention, 1-year archive, then deletion.",
+              "references": [
+                "PCI-DSS Req. 10.7",
+                "GDPR Art. 5(1)(e)"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "Refund creation, duplicate detection hits, and idempotency key expiry are security-sensitive financial actions. The design does not document an audit log trail for these events including actor, timestamp, key used, and outcome. This is required for PCI-DSS and fraud investigation.",
+              "references": [
+                "PCI-DSS Req. 10.2",
+                "GDPR Art. 30"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "high",
+              "concern_text": "The idempotency key store persists refund response payloads for up to 24 hours. If those responses contain transaction amounts, customer IDs, or masked card data, the store must be encrypted at rest. The design doc does not confirm encryption configuration for the backing data store.",
+              "references": [
+                "PCI-DSS Req. 3.5",
+                "GDPR Art. 32"
+              ]
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "The Refunds API handles payment transactions. Introducing a new persistent store (idempotency key cache/DB) that caches refund responses potentially brings that store into PCI scope. No PCI scope assessment is present in the artifacts. This must be resolved before design approval.",
+              "references": [
+                "PCI-DSS Req. 1.3",
+                "PCI-DSS Req. 3"
+              ]
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "The design does not specify IAM permissions for the service accessing the idempotency store. The principle of least privilege must be applied: the service role should have read/write only on the specific idempotency table, not broader datastore or account-level permissions.",
+              "references": [
+                "PCI-DSS Req. 7.1"
+              ]
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "medium",
+              "concern_text": "If EU customer refund data is cached in the idempotency store and that store replicates cross-region for availability, EU personal data may leave the EU. Data residency controls and replication topology must be explicitly scoped in the design for EU deployments.",
+              "references": [
+                "GDPR Art. 44-49",
+                "GDPR Art. 5(1)(f)"
+              ]
+            }
+          ],
+          "reasoning": "The idempotency key design for the Refunds API introduces a new persistent store that caches refund response payloads for up to 24 hours. From a security and privacy perspective, this creates several material risks that must be addressed. Most critically, the service touches payment data and the new store has not been assessed for PCI scope inclusion — this is a blocking concern. Additionally, there is no explicit audit logging design for financial actions such as refund creation and duplicate detection, no confirmed encryption-at-rest for the idempotency store, and no documented retention policy for logs or cached data. PII leakage into logs is a realistic risk given the data flowing through refund responses. IAM scoping for the new store is unspecified, and EU data residency for cross-region replication scenarios is unaddressed. The existing security_review_signoff artifact is noted but its scope relative to these specific new components is unclear — it must be confirmed to cover the idempotency store. The decision is approve_with_conditions: the PCI scope review must be completed and the encryption-at-rest and audit logging gaps resolved before implementation begins. Remaining medium concerns should be addressed in the implementation spec."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "high",
+              "concern_text": "The cost estimate artifact is present, but the design doc must confirm whether the idempotency key store (cache or DB) has autoscaling with a defined maximum cap. Unbounded scaling of a deduplification store under high refund request volume could create unexpected cost spikes. A hard ceiling on instance count or storage IOPS must be documented before implementation begins.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "If the idempotency key store relies on a managed third-party service (e.g., managed Redis, DynamoDB, or a cloud cache provider), the vendor SLA terms must be documented and validated against the 24-hour window guarantee. No vendor SLA reference is visible in the submitted artifacts.",
+              "references": []
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "Refunds API touches card-holder and payment transaction data. Storing idempotency keys that include or reference transaction IDs, amounts, or card tokens expands the PCI DSS scope. No PCI scope assessment is listed in the artifact set. This must be resolved before design is approved.",
+              "references": [
+                "PCI DSS v4.0 Requirement 12.5.2"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "medium",
+              "concern_text": "If idempotency key lookups or replication occur across availability zones or regions (e.g., for HA of the key store), cross-region or cross-AZ egress costs are not modeled in the cost estimate. At scale, refund deduplication traffic could generate material egress charges that are unaccounted for.",
+              "references": []
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "medium",
+              "concern_text": "Idempotency key lookup and duplicate-detection events are security-sensitive audit events tied to financial transactions. The design doc must specify a log retention policy compliant with applicable financial regulations (e.g., 7-year retention under SOX, or relevant local equivalents). No retention policy is referenced in the submitted artifacts.",
+              "references": [
+                "SOX Section 802",
+                "PCI DSS v4.0 Requirement 10.7"
+              ]
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "high",
+              "concern_text": "If EU customer refund requests are processed, idempotency keys storing transaction references or customer identifiers must remain within EU boundaries. The design doc does not address data residency controls for the key store. This must be confirmed to ensure GDPR Article 44 compliance for any cross-border transfers.",
+              "references": [
+                "GDPR Article 44",
+                "GDPR Article 46"
+              ]
+            }
+          ],
+          "reasoning": "The project is conceptually sound and addresses a real financial integrity concern. A cost estimate artifact is present, which is a positive signal. However, several FinOps and Legal/Compliance concerns prevent a clean approval. Most critically, refund operations place this service squarely within PCI DSS scope, and no PCI scope review is listed among artifacts — this is a blocking issue. GDPR data residency for EU transaction data tied to idempotency keys is high severity and unaddressed. The absence of a documented log retention policy for what are effectively financial audit events is a medium-severity compliance gap. Additionally, the cost estimate must be validated against a defined autoscaling ceiling and an egress cost model if the key store spans regions or AZs. Finally, any third-party managed service underpinning the key store must have its SLA terms documented. Conditional approval is granted pending: (1) PCI scope assessment completed and signed off, (2) GDPR residency controls documented for EU data, (3) log retention policy defined, (4) autoscaling cap confirmed in cost estimate, and (5) vendor SLA referenced if a managed service is used."
+        }
+      ],
+      "outcome": "approved_with_conditions"
+    }
+  ],
+  "final_outcome": "approved_with_conditions",
+  "usage": [
+    {
+      "prompt_tokens": 1017,
+      "completion_tokens": 752,
+      "latency_ms": 16542,
+      "cost_usd": 0.014331,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 1015,
+      "completion_tokens": 952,
+      "latency_ms": 19032,
+      "cost_usd": 0.017325,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 1017,
+      "completion_tokens": 1203,
+      "latency_ms": 24024,
+      "cost_usd": 0.021096,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "prompt_tokens": 1014,
+      "completion_tokens": 1049,
+      "latency_ms": 21770,
+      "cost_usd": 0.018777,
+      "model": "claude-sonnet-4-6"
+    }
+  ],
+  "schema_failures": 0
+}
