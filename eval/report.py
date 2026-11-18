@@ -46,14 +46,14 @@ def build_report(runs_dir: Path, scenarios_dir: Path) -> str:
     l2 = score_l2(run_paths, scenarios_dir)
 
     lines: list[str] = []
-    lines.append("# Eval Report (V1 Baseline)")
+    lines.append(f"# Eval Report ({runs_dir.as_posix()})")
     lines.append(f"_Generated {datetime.now(timezone.utc).isoformat(timespec='seconds')}_")
     lines.append(f"_Scenarios scored: {l1.runs}_")
     lines.append("")
 
     lines.append("## Master Table")
     lines.append("")
-    lines.append("| Pillar | Metric | V1 Baseline |")
+    lines.append("| Pillar | Metric | Value |")
     lines.append("|--------|--------|-------------|")
     lines.append(
         f"| Structural | Format pass rate | "
@@ -102,7 +102,7 @@ def build_report(runs_dir: Path, scenarios_dir: Path) -> str:
     lines.append("  Adding it to the scenario's `seeded_defects` improves both recall and precision.")
     lines.append("- **Noise**: the agent over-flagged. Counts as a true false positive.")
     lines.append("- **Catalog typo**: the agent malformed a defect ID (e.g. `def_def_pii_in_logs`). ")
-    lines.append("  This is a V1 schema-discipline failure; tool-use enforcement in V2 prevents it.")
+    lines.append("  This is a V1 schema-discipline failure; V2's structured outputs constrain IDs to the catalog.")
     lines.append("")
     for uf in l2.all_unmatched:
         snippet = uf.concern_text[:200] + ("..." if len(uf.concern_text) > 200 else "")

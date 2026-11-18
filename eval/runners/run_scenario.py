@@ -12,7 +12,7 @@ Usage:
     python -m eval.runners.run_scenario eval/scenarios/scn_001_pii_logging.yaml
 
 Output:
-    eval/runs/{scenario_id}__{run_id}.json
+    eval/runs_v2/{scenario_id}__{run_id}.json
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ OUTPUT_PRICE_PER_MTOK = 15.0
 DEFECT_CATALOG_PATH = Path(__file__).resolve().parents[2] / "eval" / "defect_catalog.yaml"
 
 
-# --- Personas (deliberately plain for the V1 baseline) --------------------- #
+# --- Personas (unchanged from the V1 baseline) ----------------------------- #
 
 AGENT_PERSONAS: dict[AgentRole, str] = {
     AgentRole.PM: (
@@ -278,8 +278,8 @@ def main() -> int:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("eval/runs"),
-        help="Directory to write run JSON",
+        default=Path("eval/runs_v2"),
+        help="Directory to write run JSON (eval/runs holds the V1 baseline)",
     )
     args = parser.parse_args()
 
