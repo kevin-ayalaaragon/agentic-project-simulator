@@ -44,7 +44,7 @@ V2 replaces JSON-in-prompt with grammar-constrained structured outputs. The API 
 
 **Limits of the comparison.** Seven scenarios with seeded defects is a small sample, so the intervals are wide and only large effects are detectable. V2 final versus V1 is consistent with parity, not proof of it. Enum casing is normalized before scoring, and a wrong-but-valid catalog ID remains possible; strict precision measures that.
 
-**Eval integrity.** Claude Code permission deny rules block the coding agent's edit tools from modifying the answer key (scenarios, defect catalog, human labels, V1 runs), a guard against the test tampering documented in coding agents. A Stop hook runs the offline contract tests and keeps a turn from ending while they fail, and CI runs the same tests with read-only permissions and no secrets. All 90 run files behind this table are in `eval/trials/`.
+**Eval integrity.** Claude Code permission deny rules block the coding agent's edit tools from modifying the answer key (scenarios, defect catalog, human labels, V1 runs), a guard against the test tampering documented in coding agents. A Stop hook runs the offline contract tests and keeps a turn from ending while they fail, and CI runs the same tests with read-only permissions and no secrets. All 90 run files behind this table are in `eval/trials/`, and `python -m eval.compare_trials` recomputes every number in it, including the paired intervals.
 
 ## Architecture
 
@@ -110,6 +110,7 @@ V2 closed the first V1 failure mode below; the rest are open.
 │   ├── trials/                 # 3-trial runs behind the V2 Results table
 │   ├── runs_persona/           # Per-scenario judge verdicts
 │   ├── report.py               # Aggregates L1 + L2 into the master table
+│   ├── compare_trials.py       # Recomputes the V2 Results table from eval/trials/
 │   └── report.md               # Latest generated report
 ├── tests/                      # Offline contract tests (no API calls), run in CI
 ├── .github/workflows/ci.yml    # Runs the tests on push and pull request
