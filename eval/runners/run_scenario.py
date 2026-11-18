@@ -118,19 +118,25 @@ KNOWN DEFECT CATALOG (use these IDs if a concern matches one; otherwise set defe
 
 def build_output_model(agent: AgentRole, gate: str, catalog: list[dict]) -> type[AgentResponse]:
     """Narrow AgentResponse so the decoding grammar admits only this agent, this gate,
-    and catalog defect IDs; an ID outside the catalog cannot be generated."""
+    and catalog defect IDs.
+
+    Every field is required because structured outputs emit required properties
+    before optional ones; this keeps concerns before reasoning and defect_id first
+    in each concern, matching the declared order.
+    """
     defect_ids = Enum("DefectId", {d["id"]: d["id"] for d in catalog}, type=str)
     concern = create_model(
         "CatalogConcern",
         __base__=RaisedConcern,
-        defect_id=(defect_ids | None, Field(default=None)),
+        defect_id=(defect_ids | None, ...),
+        references=(list[str], ...),
     )
     return create_model(
         "CatalogAgentResponse",
         __base__=AgentResponse,
         agent=(Literal[agent.value], ...),
         gate=(Literal[gate], ...),
-        concerns=(list[concern], Field(default_factory=list)),
+        concerns=(list[concern], ...),
     )
 
 
