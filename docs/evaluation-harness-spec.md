@@ -3,7 +3,8 @@
 > **Status (living document; spec body below is the original plan, unmodified)**
 > - **Shipped:** L1 schema validity, L2 defect detection, cost telemetry, V1 baseline across 10 scenarios (see README for numbers).
 > - **Shipped ahead of schedule:** L4 persona judge with `encroaches_on` extension, validated against 45 hand-labeled turns (0.67 Cohen's kappa, all disagreements adjacent-category). Judge additionally partitions L2's unmatched flags into legitimate unseeded catches vs persona drift.
-> - **Pending:** L3 retrieval (ChromaDB + playbooks), L5 groundedness, dataset expansion to 25 scenarios, V2 optimized column.
+> - **Shipped (V2):** grammar-constrained structured outputs narrowed to the defect catalog, parallel role calls, offline contract tests in CI, and a 3-trial V1/V2 comparison (see README V2 Results). V2 changed decoding, not retrieval.
+> - **Pending:** L3 retrieval (ChromaDB + playbooks), L5 groundedness, dataset expansion to 25 scenarios, a retrieval-grounded V2 column.
 > - **Deviations from plan:** 10 scenarios in V1 rather than 25 (deliberate Phase 1 scope cut); judge model is Opus-class rather than same-tier, which strengthens the judge but raises judging cost to ~$5 per full pass.
 
 ## Purpose

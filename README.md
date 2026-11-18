@@ -2,7 +2,7 @@
 
 A multi-agent simulator that runs proposed software projects through a gated lifecycle review (design, architecture, build, launch readiness) with autonomous LLM stakeholders playing the four roles that typically gate-keep real engineering programs: a product manager, an engineering lead, a security/privacy reviewer, and a FinOps/legal reviewer. The simulator's purpose is twofold. As a system, it stress-tests project plans by surfacing the concerns a real cross-functional review would raise. As an evaluation target, it provides a structured environment for measuring how well a stochastic multi-agent system can detect known defects, stay in role, and stay grounded under varying prompt and grounding strategies.
 
-The repository includes the simulator itself, a fixed suite of 10 fintech/payments project scenarios with seeded defects, and a five-layer evaluation harness that produces a master table comparing baseline (V1) and grounded (V2) configurations.
+The repository includes the simulator itself, a fixed suite of 10 fintech/payments project scenarios with seeded defects, and a five-layer evaluation harness that produces master tables comparing the baseline (V1) and constrained-decoding (V2) configurations.
 
 ## Baseline Results (V1)
 
@@ -44,7 +44,7 @@ V2 replaces JSON-in-prompt with grammar-constrained structured outputs. The API 
 
 **Limits of the comparison.** Seven scenarios with seeded defects is a small sample, so the intervals are wide and only large effects are detectable. V2 final versus V1 is consistent with parity, not proof of it. Enum casing is normalized before scoring, and a wrong-but-valid catalog ID remains possible; strict precision measures that.
 
-**Eval integrity.** Claude Code permission deny rules block the coding agent's edit tools from modifying the answer key (scenarios, defect catalog, human labels, V1 runs), a guard against the test tampering documented in coding agents. A Stop hook runs the offline contract tests and keeps a turn from ending while they fail, and CI runs the same tests with read-only permissions and no secrets. All 90 run files behind this table are in `eval/trials/`.
+**Eval integrity.** Claude Code permission deny rules block the coding agent's edit tools from modifying the answer key (scenarios, defect catalog, human labels, V1 runs), a guard against the test tampering documented in coding agents. A Stop hook runs the offline contract tests and keeps a turn from ending while they fail, and CI runs the same tests with read-only permissions and no secrets. All 90 run files behind this table are in `eval/trials/`, and `python -m eval.compare_trials` recomputes every number in it, including the paired intervals.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ The system has two layers: the simulator (which runs scenarios) and the evaluati
 | | L5: Groundedness | Rate of assertions traceable to project state or retrieved context |
 | | Cost | Dollars per full lifecycle simulation |
 
-Phase 1 (V1 baseline) implements L1, L2, and cost. The L4 persona judge shipped ahead of schedule with human-validated calibration; L3 (retrieval) and L5 (groundedness) remain, along with the V2 system improvements those layers measure.
+Phase 1 (V1 baseline) implements L1, L2, and cost. The L4 persona judge shipped ahead of schedule with human-validated calibration. V2 changed how outputs are decoded (see V2 Results); L3 (retrieval) and L5 (groundedness) are not built yet.
 
 ## Methodology
 
@@ -77,15 +77,15 @@ A few design decisions matter more than the numbers themselves, and are worth un
 
 **Clean scenarios aren't clean.** Three of the 10 scenarios were designed as "clean" precision negatives. In practice, all three were either blocked or approved-with-conditions because the agents found legitimate gaps. This is honest behavior for a multi-agent review system and the response is to redefine "clean" as "no `blocking`-severity flags" rather than "zero concerns." Real gate reviews work this way.
 
-**One V1 miss was a measurement artifact, not a detection failure.** On the circular-dependency scenario (`scn_007`), the engineering lead identified both seeded defects but combined them into a single concern in its `defect_id` field, leaving the second seeded defect "uncaught" by the tagged-recall scorer. Manual review of the agent's `reasoning` field shows the defect was explicitly identified. The V2 fix is a "one defect per concern" constraint enforced through tool use.
+**One V1 miss was a measurement artifact, not a detection failure.** On the circular-dependency scenario (`scn_007`), the engineering lead identified both seeded defects but combined them into a single concern in its `defect_id` field, leaving the second seeded defect "uncaught" by the tagged-recall scorer. Manual review of the agent's `reasoning` field shows the defect was explicitly identified. A "one defect per concern" constraint would close this gap; V2's structured outputs do not enforce it yet.
 
-## What V2 Targets
+## Open Targets
 
-The V1 baseline establishes specific failure modes that V2 is designed to address.
+V2 closed the first V1 failure mode below; the rest are open.
 
-- L1 retries (currently 2 across the suite) should drop to 0 with tool-use enforcement of the response schema.
-- Tagged recall should match true recall (currently 0.93 vs 1.00) once concerns are constrained to one defect each.
-- Strict precision should improve significantly with two interventions: a retrieval layer that grounds agents in gate-specific playbooks (so they raise concerns from documented review patterns rather than from generic best-practice prior), and persona-prompt tightening now targeted by the measured drift asymmetry (PM at 0.55 and engineering lead at 0.63 in-persona are the weak prompts; their dominant leak directions are documented above).
+- Done in V2: L1 retries fell from 4 across three V1 trials to 0 across three V2 trials (120 agent calls each) with grammar-constrained structured outputs (V2 Results).
+- Tagged recall should match true recall (0.93 vs 1.00 in V1) once concerns are constrained to one defect each.
+- Strict precision (0.10 to 0.11 in both V1 and V2) should improve with two interventions: a retrieval layer that grounds agents in gate-specific playbooks (so they raise concerns from documented review patterns rather than from generic best-practice prior), and persona-prompt tightening now targeted by the measured drift asymmetry (PM at 0.55 and engineering lead at 0.63 in-persona are the weak prompts; their dominant leak directions are documented above).
 - A separate cross-cutting "release coordinator" agent will be evaluated for systemic concerns (dependency cycles, sequencing, multi-service coordination) that the four role-scoped agents reliably miss on raw prompting.
 
 ## Repository Layout
@@ -106,10 +106,16 @@ The V1 baseline establishes specific failure modes that V2 is designed to addres
 │   ├── judges/
 │   │   ├── persona_judge.py    # L4 discrete-rubric judge
 │   │   └── judge_validation/   # 45 human-labeled turns + agreement scorer
-│   ├── runs/                   # ScenarioRun JSONs (one per execution)
+│   ├── runs/                   # V1 baseline ScenarioRun JSONs (read-only)
+│   ├── trials/                 # 3-trial runs behind the V2 Results table
 │   ├── runs_persona/           # Per-scenario judge verdicts
 │   ├── report.py               # Aggregates L1 + L2 into the master table
+│   ├── compare_trials.py       # Recomputes the V2 Results table from eval/trials/
 │   └── report.md               # Latest generated report
+├── tests/                      # Offline contract tests (no API calls), run in CI
+├── .github/workflows/ci.yml    # Runs the tests on push and pull request
+├── .claude/settings.json       # Claude Code permission rules and Stop-hook test gate
+├── CLAUDE.md                   # Commands and rules for Claude Code sessions
 └── docs/
     └── evaluation-harness-spec.md   # Internal spec for the eval harness
 ```
@@ -119,11 +125,17 @@ The V1 baseline establishes specific failure modes that V2 is designed to addres
 Setup:
 
 ```bash
-pip install anthropic pydantic pyyaml python-dotenv
+pip install anthropic pydantic pyyaml python-dotenv pytest
 echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
 ```
 
-Run one scenario:
+Run the offline tests (no API key needed):
+
+```bash
+python -m pytest -q
+```
+
+Run one scenario (writes to `eval/runs_v2/`; `eval/runs/` holds the V1 baseline):
 
 ```bash
 python -m eval.runners.run_scenario eval/scenarios/scn_001_pii_logging.yaml
@@ -137,10 +149,10 @@ for f in eval/scenarios/scn_*.yaml; do
 done
 ```
 
-Score and generate the report:
+Score and generate the report (`--runs-dir eval/runs` scores the V1 baseline):
 
 ```bash
-python -m eval.report
+python -m eval.report --runs-dir eval/runs_v2 --out eval/report_v2.md
 ```
 
 Judge persona fidelity and validate the judge (L4):
@@ -150,4 +162,4 @@ python -m eval.metrics.persona
 python -m eval.judges.judge_validation.score_agreement
 ```
 
-The master table at the top of this README is produced by those commands. Each scenario costs approximately $0.08 on Claude Sonnet at the time of this baseline; the full suite is around $0.80. Judging all 301 concerns with an Opus-class judge cost approximately $5, so re-judging is cached per scenario and only re-runs with `--force`.
+The V1 table at the top of this README is produced by those commands. Each scenario costs approximately $0.08 on Claude Sonnet at the time of this baseline; the full suite is around $0.80. Judging all 301 concerns with an Opus-class judge cost approximately $5, so re-judging is cached per scenario and only re-runs with `--force`.

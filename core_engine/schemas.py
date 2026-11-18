@@ -118,7 +118,7 @@ class RaisedConcern(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     # The ID of the seeded defect this concern corresponds to, if any.
-    # The agent is prompted with the list of seeded defect IDs and asked
+    # The agent is prompted with the full defect catalog (not the seeded IDs) and asked
     # to set this field when its concern maps to one. If the agent thinks
     # it has found an unseeded issue, it sets this to None.
     #
@@ -184,7 +184,7 @@ class ScenarioRun(BaseModel):
     """The complete record of running one scenario through the simulator.
 
     This is the unit of data the L2-L5 scorers operate on, and the unit
-    report.py aggregates across the 25-scenario suite.
+    report.py aggregates across the 10-scenario suite.
     """
     model_config = ConfigDict(extra="forbid")
 

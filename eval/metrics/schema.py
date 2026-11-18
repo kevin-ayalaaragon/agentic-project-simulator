@@ -1,16 +1,15 @@
 """L1: Schema validity scorer.
 
-For the V1 baseline, this measures whether the agent returned a parseable,
-schema-compliant response. The runner already enforces validation with one
-retry; we measure two related signals from its output:
+Measures whether the agent returned a parseable, schema-compliant response.
+The runner validates with one retry; we measure two related signals from its output:
 
   - format_pass_rate = valid_responses / expected_responses
     "Did we end up with a parseable response from every agent we called?"
   - retries_used: the raw count of failed attempts the runner needed
     "How shaky is the raw model output before the retry crutch?"
 
-In V2, tool-use enforcement should drive pass_rate to 100% and retries to 0.
-The retry count is the more sensitive metric and the one V2 should move most.
+V2's grammar-constrained structured outputs took retries from 4 across three V1 trials
+to 0 across three V2 trials (120 agent calls each); the retry count is the more sensitive of the two signals.
 """
 
 from __future__ import annotations
