@@ -8,7 +8,9 @@
       "Edit(/eval/defect_catalog.yaml)",
       "Edit(/eval/judges/judge_validation/human_labels.csv)",
       "Edit(/eval/judges/judge_validation/sample_key.json)",
-      "Edit(/eval/runs/**)"
+      "Edit(/eval/runs/**)",
+      "Edit(/eval/artifacts.yaml)",
+      "Edit(/eval/trials/**)"
     ]
   },
   "hooks": {

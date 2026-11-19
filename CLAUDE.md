@@ -3,10 +3,10 @@
 ## Commands
 - Install: `pip install anthropic pydantic pyyaml python-dotenv pytest`
 - Tests (no API calls): `python -m pytest -q`; one file: `python -m pytest tests/test_runner_contract.py -q`
-- One scenario (paid API call, needs `ANTHROPIC_API_KEY` in `.env`): `python -m eval.runners.run_scenario eval/scenarios/<file>.yaml --output-dir eval/runs_v2`
-- Report: `python -m eval.report --runs-dir eval/runs_v2`
+- One scenario (paid API call, needs `ANTHROPIC_API_KEY` in `.env`): `python -m eval.runners.run_scenario eval/scenarios/<file>.yaml --mode v2|control|agent --output-dir eval/runs_v2`
+- Report: `python -m eval.report --runs-dir eval/runs_v2`; V2/V3 comparison: `python -m eval.compare_trials --baseline v2 --configs v2 v3_control v3_agent`
 
 ## Rules
 - Agent output shape is defined only by the Pydantic models in `core_engine/schemas.py`; the API enforces it through `output_config`, so prompts carry no format instructions.
-- The eval answer key (`eval/scenarios/`, `eval/defect_catalog.yaml`, `eval/judges/judge_validation/` labels) and the V1 baseline in `eval/runs/` are read-only; permission rules in `.claude/settings.json` block edits.
+- The eval answer key (`eval/scenarios/`, `eval/defect_catalog.yaml`, `eval/judges/judge_validation/` labels), the scenario inputs in `eval/artifacts.yaml`, and recorded runs in `eval/runs/` and `eval/trials/` are read-only; permission rules in `.claude/settings.json` block edits.
 - Ask before running anything that calls the API; each scenario run costs money.
