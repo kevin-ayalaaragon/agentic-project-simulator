@@ -6,6 +6,8 @@ scenario's current gate, aggregates into a ScenarioRun, writes the result as JSO
 V2: grammar-constrained structured outputs (output_config json_schema) narrowed
 to catalog defect IDs; one retry, with each failed attempt recorded by cause.
 V1 results (JSON-in-prompt) remain in eval/runs/ for comparison.
+V3 modes (--mode): control puts eval/artifacts.yaml text in the prompt; agent gives
+only artifact names and a strict read_artifact tool, looping up to MAX_TOOL_TURNS.
 
 Usage:
     export ANTHROPIC_API_KEY=sk-ant-...
@@ -61,6 +63,8 @@ INPUT_PRICE_PER_MTOK = 3.0
 OUTPUT_PRICE_PER_MTOK = 15.0
 
 DEFECT_CATALOG_PATH = Path(__file__).resolve().parents[2] / "eval" / "defect_catalog.yaml"
+ARTIFACTS_PATH = Path(__file__).resolve().parents[2] / "eval" / "artifacts.yaml"
+MAX_TOOL_TURNS = 6  # agent mode: tool-call rounds allowed per attempt
 
 
 # --- Personas (unchanged from the V1 baseline) ----------------------------- #
@@ -102,16 +106,60 @@ def load_defect_catalog() -> list[dict[str, str]]:
     return yaml.safe_load(DEFECT_CATALOG_PATH.read_text()) or []
 
 
-def build_user_prompt(scenario: Scenario, agent: AgentRole, catalog: list[dict]) -> str:
+def load_artifacts(scenario_id: str) -> dict[str, str]:
+    data = yaml.safe_load(ARTIFACTS_PATH.read_text(encoding="utf-8")) or {}
+    return data.get(scenario_id, {})
+
+
+def build_user_prompt(
+    scenario: Scenario,
+    agent: AgentRole,
+    catalog: list[dict],
+    mode: str = "v2",
+    artifacts: dict[str, str] | None = None,
+) -> str:
     catalog_lines = "\n".join(f"  - {d['id']}: {d['description']}" for d in catalog)
     project_dict = scenario.project_state.model_dump(mode="json")
-    return f"""You are reviewing this project at the {scenario.project_state.stage.value}.
+    prompt = f"""You are reviewing this project at the {scenario.project_state.stage.value}.
 
 PROJECT STATE:
 {json.dumps(project_dict, indent=2)}
 
 KNOWN DEFECT CATALOG (use these IDs if a concern matches one; otherwise set defect_id to null):
 {catalog_lines or "  (catalog empty)"}"""
+    if mode == "control":
+        texts = "\n\n".join(f"### {name}\n{text.strip()}" for name, text in (artifacts or {}).items())
+        prompt += f"\n\nARTIFACTS:\n{texts}"
+    elif mode == "agent":
+        prompt += "\n\nArtifact contents are not included. Read any artifact you need with the read_artifact tool."
+    return prompt
+
+
+def build_artifact_tool(artifacts: dict[str, str]) -> dict:
+    """Strict tool whose input enum is this scenario's artifact names, so an unlisted name cannot be requested."""
+    return {
+        "name": "read_artifact",
+        "description": (
+            "Return the full text of one project artifact listed under PROJECT STATE artifacts. "
+            "Call it for each artifact whose contents you need before deciding; it returns plain text "
+            "and has no side effects."
+        ),
+        "strict": True,
+        "input_schema": {
+            "type": "object",
+            "properties": {"name": {"type": "string", "enum": list(artifacts), "description": "Artifact name exactly as listed."}},
+            "required": ["name"],
+            "additionalProperties": False,
+        },
+    }
+
+
+def run_tool(artifacts: dict[str, str], tool_input: dict) -> tuple[str, bool]:
+    """Execute read_artifact. Returns (content, is_error)."""
+    name = tool_input.get("name")
+    if name not in artifacts:
+        return f"Unknown artifact: {name!r}. Available: {', '.join(artifacts)}", True
+    return artifacts[name].strip(), False
 
 
 # --- Output schema --------------------------------------------------------- #
@@ -154,43 +202,68 @@ def _lowercase_enums(data: dict) -> dict:
 
 # --- Single agent call ----------------------------------------------------- #
 
-def call_agent(
-    client: Anthropic,
-    agent: AgentRole,
-    scenario: Scenario,
-    catalog: list[dict],
-) -> tuple[AgentResponse | None, TokenUsage, list[str]]:
-    """Run one agent. Returns (response or None on hard failure, usage, failure causes)."""
-    system_prompt = AGENT_PERSONAS[agent]
-    user_prompt = build_user_prompt(scenario, agent, catalog)
-    output_model = build_output_model(agent, scenario.project_state.stage.value, catalog)
-    output_config = {"format": {"type": "json_schema", "schema": transform_schema(output_model)}}
-    failure_causes: list[str] = []
-    response: AgentResponse | None = None
-    totals = {"in": 0, "out": 0, "latency_ms": 0}
-
-    for _ in range(2):
+def _converse(client, system_prompt, user_prompt, output_config, artifacts, mode, totals, tool_calls):
+    """One attempt. In agent mode, loop over tool calls until Claude answers or the turn cap is hit."""
+    messages = [{"role": "user", "content": user_prompt}]
+    extra = {"tools": [build_artifact_tool(artifacts)]} if mode == "agent" else {}
+    for _ in range(MAX_TOOL_TURNS + 1):
         start = time.perf_counter()
         api_response = client.messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=messages,
             output_config=output_config,
+            **extra,
         )
         totals["latency_ms"] += int((time.perf_counter() - start) * 1000)
         totals["in"] += api_response.usage.input_tokens
         totals["out"] += api_response.usage.output_tokens
+        if api_response.stop_reason != "tool_use":
+            return api_response
+        results = []
+        for block in api_response.content:
+            if block.type == "tool_use":
+                content, is_error = run_tool(artifacts, block.input)
+                tool_calls.append(block.input.get("name", ""))
+                results.append({"type": "tool_result", "tool_use_id": block.id, "content": content, "is_error": is_error})
+        messages += [{"role": "assistant", "content": api_response.content}, {"role": "user", "content": results}]
+    return None
 
+
+def call_agent(
+    client: Anthropic,
+    agent: AgentRole,
+    scenario: Scenario,
+    catalog: list[dict],
+    mode: str = "v2",
+) -> tuple[AgentResponse | None, TokenUsage, list[str]]:
+    """Run one agent. Returns (response or None on hard failure, usage, failure causes)."""
+    system_prompt = AGENT_PERSONAS[agent]
+    artifacts = load_artifacts(scenario.id) if mode != "v2" else {}
+    user_prompt = build_user_prompt(scenario, agent, catalog, mode, artifacts)
+    output_model = build_output_model(agent, scenario.project_state.stage.value, catalog)
+    output_config = {"format": {"type": "json_schema", "schema": transform_schema(output_model)}}
+    failure_causes: list[str] = []
+    response: AgentResponse | None = None
+    totals = {"in": 0, "out": 0, "latency_ms": 0}
+    tool_calls: list[str] = []
+
+    for _ in range(2):
+        api_response = _converse(client, system_prompt, user_prompt, output_config, artifacts, mode, totals, tool_calls)
+        if api_response is None:
+            failure_causes.append("max_tool_turns")
+            continue
         if api_response.stop_reason in ("refusal", "max_tokens"):
             failure_causes.append(api_response.stop_reason)
             continue
         try:
-            data = _lowercase_enums(json.loads(api_response.content[0].text))
+            text = [b.text for b in api_response.content if b.type == "text"][-1]
+            data = _lowercase_enums(json.loads(text))
             parsed = output_model.model_validate(data)
             response = AgentResponse.model_validate(parsed.model_dump(mode="json"))
             break
-        except (json.JSONDecodeError, ValidationError):
+        except (json.JSONDecodeError, ValidationError, IndexError):
             failure_causes.append("validation")
 
     cost = (
@@ -203,6 +276,7 @@ def call_agent(
         latency_ms=totals["latency_ms"],
         cost_usd=round(cost, 6),
         model=MODEL,
+        tool_calls=tool_calls,
     )
     return response, usage, failure_causes
 
@@ -221,7 +295,7 @@ def aggregate_outcome(responses: list[AgentResponse]) -> GateOutcome:
 
 # --- Main ------------------------------------------------------------------ #
 
-def run_scenario(scenario_path: Path, output_dir: Path) -> ScenarioRun:
+def run_scenario(scenario_path: Path, output_dir: Path, mode: str = "v2") -> ScenarioRun:
     scenario = Scenario.model_validate(yaml.safe_load(scenario_path.read_text()))
     catalog = load_defect_catalog()
 
@@ -234,7 +308,7 @@ def run_scenario(scenario_path: Path, output_dir: Path) -> ScenarioRun:
 
     # Sectioning: the four role reviews are independent, so they run concurrently.
     with ThreadPoolExecutor(max_workers=len(AgentRole)) as pool:
-        results = list(pool.map(lambda a: (a, *call_agent(client, a, scenario, catalog)), AgentRole))
+        results = list(pool.map(lambda a: (a, *call_agent(client, a, scenario, catalog, mode)), AgentRole))
 
     for agent, response, usage, causes in results:
         usages.append(usage)
@@ -263,6 +337,7 @@ def run_scenario(scenario_path: Path, output_dir: Path) -> ScenarioRun:
         usage=usages,
         schema_failures=len(failure_causes),
         schema_failure_causes=failure_causes,
+        mode=mode,
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -281,6 +356,12 @@ def main() -> int:
         default=Path("eval/runs_v2"),
         help="Directory to write run JSON (eval/runs holds the V1 baseline)",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["v2", "control", "agent"],
+        default="v2",
+        help="v2: project state only; control: artifact text in the prompt; agent: artifacts read through a tool",
+    )
     args = parser.parse_args()
 
     if not args.scenario.exists():
@@ -290,7 +371,7 @@ def main() -> int:
         print("ANTHROPIC_API_KEY not set", file=sys.stderr)
         return 1
 
-    run = run_scenario(args.scenario, args.output_dir)
+    run = run_scenario(args.scenario, args.output_dir, args.mode)
     total_cost = sum(u.cost_usd for u in run.usage)
     print(f"scenario:        {run.scenario_id}")
     print(f"outcome:         {run.final_outcome.value}")
