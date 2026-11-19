@@ -1,0 +1,272 @@
+{
+  "scenario_id": "scn_004_unbounded_compute_for_reconciliation",
+  "run_id": "683d8d22-2259-4ae1-9846-8f9acc431d39",
+  "started_at": "2026-11-18T21:31:21.778193Z",
+  "finished_at": "2026-11-18T21:31:40.838421Z",
+  "gate_results": [
+    {
+      "gate": "architecture_review_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "architecture_review_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "blocking",
+              "concern_text": "The cost estimate is explicitly marked TBD at the architecture review gate. With a record volume swinging between 40M and 200M records and an uncapped autoscaling cluster, cost exposure is highly variable and unknown. This must be resolved before the gate can pass.",
+              "references": [
+                "cost_estimate_TBD",
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "blocking",
+              "concern_text": "The autoscaling cluster has no maximum node cap documented. Given the 5x variance in daily record volume (40M to 200M), an uncapped cluster creates unbounded cost and operational risk. A ceiling must be defined and validated against the 6am ET SLA.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "high",
+              "concern_text": "The acceptance criterion '100% record coverage' is not testable as stated. It does not define what constitutes a record, how coverage is measured, what happens to late-arriving records, or what tolerance (if any) exists for system errors. This needs a concrete, operationalized definition.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "medium",
+              "concern_text": "There is no post-launch success metric beyond the two acceptance criteria. The project should define how ongoing health is measured — e.g., p99 job completion time, reconciliation error rate, alert thresholds — to distinguish a successful v2 from v1 in production.",
+              "references": [
+                "design_doc_v3"
+              ]
+            }
+          ],
+          "reasoning": "This project cannot pass the architecture review gate in its current state. Two blocking issues exist: (1) the cost estimate is entirely absent despite an autoscaling compute model with known high variance in workload, and (2) the autoscaling cluster has no maximum cap, creating unbounded cost exposure. These two issues are tightly coupled — without a cost ceiling, there is no basis for a cost estimate, and without a cost estimate, budget approval is impossible. Additionally, the acceptance criterion of '100% record coverage' is not operationally testable as written — it needs a precise definition of scope, measurement methodology, and error tolerance. Finally, there are no durable success metrics for post-launch evaluation of v2 vs v1. I recommend blocking until: cost ceiling is defined, a concrete cost estimate is produced, and acceptance criteria are rewritten to be unambiguously testable."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "architecture_review_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "blocking",
+              "concern_text": "The autoscaling cluster for the nightly reconciliation job has no maximum node cap. With a volume range of 40M–200M records, an autoscaling runaway event (e.g., due to a misconfiguration, retry storm, or data anomaly) could result in unbounded compute spend. A hard cap on cluster size is mandatory before approval.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "blocking",
+              "concern_text": "The cost estimate is explicitly marked TBD in both the project state and the cost_estimate_TBD artifact. No figures, ranges, or upper-bound estimates are provided. This is a required artifact at the architecture review gate and must be completed before the gate can clear.",
+              "references": [
+                "cost_estimate_TBD",
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "high",
+              "concern_text": "The design references a nightly job processing up to 200M records but provides no egress or data-transfer cost model. If settlement records are sourced from or written to cross-region or cloud storage endpoints, egress costs at this volume could be material. A cost model must address data movement explicitly.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "high",
+              "concern_text": "The design document does not describe a rollback procedure for a failed or partially-completed reconciliation run. Given that this is a financial settlement system, a failed mid-run job could leave records in an inconsistent state. A documented rollback and recovery procedure is required.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_idempotency",
+              "severity": "high",
+              "concern_text": "There is no mention of idempotency guarantees for record mutation during reconciliation. If the nightly job is retried after a partial failure, duplicate writes or double-settlements could occur. The design must specify how repeated executions are made safe.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "medium",
+              "concern_text": "The acceptance criterion 'Reconciliation completes by 6am ET' lacks a defined SLA for what happens if the deadline is missed (alerting threshold, escalation path). '100% record coverage' lacks a testable definition of how coverage is verified and what the tolerance is for edge-case record types. Both criteria need operational definitions.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_backpressure",
+              "severity": "medium",
+              "concern_text": "The design does not describe backpressure controls on the record ingestion pipeline feeding the reconciliation job. At peak volume (200M records), an unbounded consumer without queue depth limits or rate controls risks overwhelming downstream settlement systems or storage layers.",
+              "references": [
+                "design_doc_v3"
+              ]
+            }
+          ],
+          "reasoning": "This project cannot be approved at the architecture review gate in its current state. Two blocking issues exist: the autoscaling cluster has no maximum node cap (creating unbounded cost and resource risk on a job with 5x volume variance), and the cost estimate is entirely absent. For a financial settlement system processing up to 200M records nightly, these are non-negotiable. Beyond the blockers, the design is operationally immature: there is no rollback plan for partial failures, no idempotency guarantee against retry-driven double-settlements, no backpressure controls, and no egress cost model. The acceptance criteria, while directionally correct, lack testable definitions needed for verification. All blocking and high-severity items must be resolved before re-submission. Medium items should be addressed in the same revision cycle."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "architecture_review_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "Settlement reconciliation processes financial records that likely include payment card data. No PCI-DSS scope assessment is documented anywhere in the design artifacts. If card data (PANs, CVVs, track data) is in scope, the architecture must be reviewed for PCI compliance before proceeding.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "The design document describes a nightly reconciliation job processing up to 200M settlement records but makes no mention of audit logging for security-sensitive actions such as data access, record mutation, reconciliation overrides, or job execution events. Financial reconciliation systems require a full audit trail.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "high",
+              "concern_text": "The design does not specify encryption at rest for settlement records or intermediate data stores used during reconciliation. Settlement data is highly sensitive financial data and must be encrypted at rest with documented key management practices.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "high",
+              "concern_text": "There is no mention of log redaction or masking controls in the design. A job processing tens to hundreds of millions of financial settlement records has a high risk of writing PII (names, account numbers, etc.) to logs without redaction. This must be explicitly addressed before build begins.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "medium",
+              "concern_text": "No log retention policy is defined for the reconciliation job or its cluster. Financial audit and regulatory requirements (e.g., PCI-DSS requires one year of log retention) mandate a defined and enforced retention schedule.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "The design does not specify IAM roles or permissions for the autoscaling cluster. Processing 40M–200M settlement records with an unscoped IAM role creates significant risk of privilege escalation or lateral movement. Least-privilege IAM must be explicitly designed and documented.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "medium",
+              "concern_text": "Settlement records may contain EU subject data. The design contains no data residency controls or documentation of where data is stored or replicated. If EU personal data is processed, residency constraints and transfer mechanisms must be documented.",
+              "references": [
+                "design_doc_v3"
+              ]
+            }
+          ],
+          "reasoning": "The Daily Settlement Reconciliation v2 design document (v3) raises several significant security and privacy concerns that must be resolved before architecture approval. Most critically, there is no PCI-DSS scope assessment despite the system processing settlement records that are highly likely to include payment card data — this is a blocking concern. Beyond PCI, the design is silent on audit logging, encryption at rest, PII log redaction, IAM scoping, log retention policy, and data residency controls. These omissions are collectively serious for a financial system processing up to 200M records nightly. The project is approved with conditions: the team must (1) complete a PCI scope assessment, (2) document audit logging architecture, (3) confirm and document encryption at rest with key management, (4) implement and document PII redaction in all log pipelines, (5) define a log retention policy, (6) produce least-privilege IAM role definitions, and (7) document data residency and any GDPR transfer mechanisms before moving to the build gate."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "architecture_review_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "blocking",
+              "concern_text": "The cost estimate artifact is explicitly marked TBD. No compute, storage, or operational cost figures have been provided at this gate. A nightly job processing up to 200M records on an autoscaling cluster without any cost model is unacceptable for gate passage.",
+              "references": [
+                "cost_estimate_TBD",
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "blocking",
+              "concern_text": "The autoscaling cluster has no documented maximum node cap. With a 5x swing in record volume (40M to 200M records), unbounded autoscaling creates unbounded cost exposure. A runaway scaling event could result in catastrophic infrastructure spend with no control mechanism.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "high",
+              "concern_text": "The design references cross-service settlement data flows but provides no egress cost model. At 200M record volumes, cross-region or cross-AZ data transfer costs could be material and are entirely unmodeled.",
+              "references": [
+                "design_doc_v3",
+                "cost_estimate_TBD"
+              ]
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "high",
+              "concern_text": "This is a settlement reconciliation system, which very likely touches payment card transaction data. No PCI DSS scope assessment is referenced in any artifact. If card data is in scope, this gate cannot approve without a PCI scope determination.",
+              "references": [
+                "design_doc_v3"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "No vendor SLA terms are documented for any third-party dependencies (e.g., cloud provider autoscaling guarantees, any upstream data feed providers). The 6am ET completion SLA cannot be validated without upstream SLA documentation.",
+              "references": [
+                "design_doc_v3"
+              ]
+            }
+          ],
+          "reasoning": "This project is blocked at the architecture review gate on two blocking defects and three additional high/medium concerns. First, the cost estimate is entirely absent (TBD) for a workload with a 5x volume range (40M–200M records), making financial approval impossible. Second, the autoscaling cluster has no maximum node cap, creating unbounded cost exposure that is unacceptable from a FinOps governance standpoint—a single runaway job could generate uncontrolled spend. Additionally, there is no egress cost model for what are likely significant inter-service data flows, no PCI scope review for a payment settlement system, and no vendor SLA documentation to backstop the stated 6am ET SLA. The project must return with a complete cost estimate including ceiling figures, a defined autoscaling maximum, an egress cost model, a PCI scope determination, and documented vendor SLAs before it can proceed through this gate."
+        }
+      ],
+      "outcome": "blocked"
+    }
+  ],
+  "final_outcome": "blocked",
+  "usage": [
+    {
+      "prompt_tokens": 2117,
+      "completion_tokens": 597,
+      "latency_ms": 13067,
+      "cost_usd": 0.015306,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2115,
+      "completion_tokens": 886,
+      "latency_ms": 19014,
+      "cost_usd": 0.019635,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2117,
+      "completion_tokens": 868,
+      "latency_ms": 18203,
+      "cost_usd": 0.019371,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2114,
+      "completion_tokens": 684,
+      "latency_ms": 14305,
+      "cost_usd": 0.016602,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    }
+  ],
+  "schema_failures": 0,
+  "schema_failure_causes": [],
+  "mode": "control"
+}

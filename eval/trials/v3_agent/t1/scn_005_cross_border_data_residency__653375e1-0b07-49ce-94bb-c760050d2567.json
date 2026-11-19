@@ -1,0 +1,294 @@
+{
+  "scenario_id": "scn_005_cross_border_data_residency",
+  "run_id": "653375e1-0b07-49ce-94bb-c760050d2567",
+  "started_at": "2026-11-18T21:22:49.855933Z",
+  "finished_at": "2026-11-18T21:23:14.353307Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "blocking",
+              "concern_text": "The replication topology explicitly routes EU customer profile data to a US-East primary node for latency reasons. GDPR prohibits transferring EU personal data outside the EU/EEA without appropriate residency controls or safeguards. The design doc mentions GDPR only in passing and provides no residency control design whatsoever. This is a blocking issue that must be resolved before the design can proceed.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_transfer_mechanism",
+              "severity": "blocking",
+              "concern_text": "There is no documented legal mechanism (e.g., Standard Contractual Clauses, Adequacy Decision, Binding Corporate Rules) to cover the EU-to-US cross-border data transfer described in the replication topology. Without a documented transfer mechanism, the architecture cannot lawfully replicate EU customer data to US-East. This must be resolved at design stage.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "high",
+              "concern_text": "The design proposes continuous EU-to-US-East replication of customer profile data at unspecified volume and frequency. There is no egress cost model in either artifact. Cross-region (and cross-continental) data egress from cloud providers is a material line-item cost that must be estimated and approved before build begins.",
+              "references": [
+                "replication_topology",
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "medium",
+              "concern_text": "The stated acceptance criteria cover a latency SLO (reads under 50ms globally) and a consistency requirement (strong consistency on writes), but there are no success metrics for the product or business outcomes this service is meant to drive (e.g., profile data freshness rate, adoption by consuming services, error rate budget). Without these, the team cannot demonstrate the project delivered its intended value.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "medium",
+              "concern_text": "'Strong consistency on writes' is not a testable acceptance criterion in its current form. It does not specify the consistency model (e.g., linearizability, sequential), how it will be measured or verified in acceptance testing, or what the pass/fail threshold is. This criterion needs a concrete, testable definition before gate approval.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "medium",
+              "concern_text": "Neither artifact documents a rollback procedure for the new replication topology or the profile service itself. Given that this service is global and customer-facing, a rollback plan covering both schema changes and replication configuration is required at design gate.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            }
+          ],
+          "reasoning": "Both artifacts were read and evaluated. The project is blocked primarily on two data-governance issues that are architectural in nature and cannot be deferred: (1) EU customer data is being replicated to US-East without any residency controls, violating GDPR's data transfer rules; and (2) there is no documented cross-border transfer mechanism (SCCs, adequacy decision, etc.). These are not implementation details — they fundamentally constrain what the replication topology can look like and must be resolved before engineering work proceeds. Additionally, there is no egress cost model for what will be continuous intercontinental replication, a 'strong consistency on writes' acceptance criterion that is not testable as written, no product-level success metrics, and no rollback plan. The design should be returned to the team with a clear requirement to: redesign the topology to keep EU data in the EU or document the lawful transfer basis; add an egress cost estimate; sharpen the consistency criterion into a testable definition; add business-outcome success metrics; and document a rollback procedure."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "blocking",
+              "concern_text": "The replication topology explicitly routes EU customer profile data to a US-East primary node for latency reasons. EU personal data stored or processed outside the EU/EEA requires a lawful residency or transfer mechanism under GDPR Art. 44-49. The design doc mentions GDPR only in passing and provides no residency controls (e.g., EU-primary with read replicas, data partitioning by region, or write redirection).",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_transfer_mechanism",
+              "severity": "blocking",
+              "concern_text": "No documented legal transfer mechanism (Standard Contractual Clauses, Adequacy Decision, Binding Corporate Rules, etc.) is present for the EU→US-East cross-border data flow. This is a hard legal and architectural blocker; the topology cannot be deployed without it.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "high",
+              "concern_text": "Continuous cross-region replication from EU to US-East will generate significant ongoing data-egress costs. Neither artifact contains an egress cost model or volume estimate. At global profile-service scale this could be material and must be quantified before the design is approved.",
+              "references": [
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_sla_math_broken",
+              "severity": "high",
+              "concern_text": "The acceptance criterion requires profile reads under 50ms globally with strong consistency on writes. Strong consistency across a transatlantic replication path (EU→US-East) typically adds 80-150ms of round-trip latency alone, making the 50ms global read target mathematically unachievable without a fundamentally different topology (e.g., regional primaries with local reads).",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_circuit_breaker",
+              "severity": "medium",
+              "concern_text": "No fallback or circuit-breaker strategy is described for the cross-region replication link. If the EU↔US-East replication path degrades or partitions, the service's behavior (stale reads, write rejection, split-brain) is undefined. A documented degraded-mode and circuit-breaker pattern is required for a globally distributed critical service.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "medium",
+              "concern_text": "Neither artifact documents a rollback procedure for the replication topology change. If the new topology is applied and causes data consistency issues or regulatory violations, there is no defined path to revert. A rollback plan covering both data and topology state is mandatory before deployment.",
+              "references": [
+                "design_doc_v2"
+              ]
+            }
+          ],
+          "reasoning": "Both artifacts together reveal a design that is blocked on two independent critical axes. First, the EU→US-East replication topology is a hard GDPR residency and cross-border-transfer violation — EU personal data cannot be shipped to a US primary without both explicit residency controls and a documented legal transfer mechanism (SCCs, adequacy decision, etc.). These two issues alone are blocking. Second, the stated acceptance criteria are self-contradictory with the chosen topology: achieving sub-50ms global reads while enforcing strong consistency across a transatlantic link is physically infeasible; the SLA math does not close. Supporting that, there is no egress cost model for what will be a high-volume continuous replication stream, no circuit-breaker/fallback for replication path failures, and no rollback plan. The design must be reworked to adopt a region-local primary with per-region strong consistency and replicated-read secondaries, add legal transfer documentation, model egress costs, define degraded-mode behavior, and include a rollback procedure before it can pass the design gate."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "blocking",
+              "concern_text": "The replication topology explicitly routes EU customer profile data to a US-East primary node for latency reasons. This is a direct violation of GDPR data residency requirements unless robust residency controls are in place. Neither the design doc nor the topology document any mechanism to restrict, isolate, or govern EU personal data stored outside the EU. This must be resolved before proceeding.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_transfer_mechanism",
+              "severity": "blocking",
+              "concern_text": "The design acknowledges GDPR only 'in passing' and provides no documented legal mechanism (e.g., Standard Contractual Clauses, Binding Corporate Rules, or an adequacy decision) to legitimize the transfer of EU personal data to US-East. Under GDPR Chapter V, a valid transfer mechanism is mandatory for any cross-border personal data transfer.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "The design document does not describe any audit logging for security-sensitive actions such as profile reads, writes, or administrative access. For a customer profile service handling personal data, audit trails are required for GDPR accountability compliance and incident forensics.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "medium",
+              "concern_text": "The design makes no mention of PII redaction or masking in application logs. Customer profile data (names, emails, addresses, etc.) is highly likely to appear in debug or error logs without explicit controls. A log sanitization policy must be defined.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "high",
+              "concern_text": "The design document does not specify encryption-at-rest for the customer profile data store. Given that this service stores personal data subject to GDPR, encryption at rest with documented key management is required.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "No IAM or access control model is described in the design. Without a least-privilege IAM definition, there is a risk that service roles or operators will be granted overly broad access to sensitive customer profile data.",
+              "references": [
+                "design_doc_v2"
+              ]
+            }
+          ],
+          "reasoning": "This design presents two blocking security/privacy defects that must be resolved before the gate can pass. First, EU customer personal data is being actively replicated to a US-East primary, which constitutes a cross-border transfer under GDPR with no residency controls documented. Second, there is no legal transfer mechanism (SCCs, BCRs, adequacy decision) cited anywhere in the design. These two issues alone are sufficient to block. Beyond the blockers, the design is silent on audit logging, PII redaction in logs, encryption at rest, and IAM scoping — all of which are high or medium severity gaps for a service that is explicitly a customer profile store. The project must address the GDPR residency and transfer mechanism issues as a minimum before re-submission, and should also produce a complete security controls section covering encryption, logging, and IAM."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "blocking",
+              "concern_text": "The design explicitly replicates EU customer profile data to a US-East primary node for latency optimization. GDPR Article 44 restricts transfers of EU personal data to third countries unless adequate safeguards exist. The design doc mentions GDPR only in passing and provides no residency controls, exemptions, or technical measures (e.g., anonymization, pseudonymization) to lawfully permit this cross-border storage.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_transfer_mechanism",
+              "severity": "blocking",
+              "concern_text": "There is no documented legal transfer mechanism for the EU→US-East data flow. Valid mechanisms under GDPR Chapter V include Standard Contractual Clauses (SCCs), Binding Corporate Rules (BCRs), or reliance on the EU-US Data Privacy Framework. None of these are referenced or in place per the design artifacts.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "high",
+              "concern_text": "The replication topology routes EU customer data continuously to US-East. Cross-region and cross-continent data egress (EU→US) incurs significant per-GB transfer costs at all major cloud providers. No egress cost model or estimate is present in either artifact, creating unbounded cost exposure that scales directly with the customer profile dataset size and write throughput.",
+              "references": [
+                "replication_topology",
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "high",
+              "concern_text": "The design doc and replication topology contain no cost estimates for the global replication infrastructure (storage, compute, network egress). A required cost estimate at design gate is absent, making it impossible to validate unit economics or set a cost ceiling.",
+              "references": [
+                "design_doc_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "medium",
+              "concern_text": "No maximum cap on autoscaling or replication throughput is defined. Given a globally replicated profile service, unbounded write amplification across regions could result in runaway infrastructure spend. A cost ceiling or quota guard should be specified before build begins.",
+              "references": [
+                "design_doc_v2",
+                "replication_topology"
+              ]
+            }
+          ],
+          "reasoning": "This design is blocked on two independent blocking defects that cannot be deferred to a later gate. First, routing EU customer personal data to a US-East primary is a direct GDPR Chapter V violation absent a documented adequacy decision or valid transfer mechanism (SCCs, BCRs, or EU-US DPF). The design acknowledges GDPR in passing but provides no residency controls, no technical safeguards, and no legal transfer instrument—this exposes the company to regulatory fines of up to 4% of global annual turnover. Second, no egress cost model or cost estimate exists for a topology that continuously streams EU→US data, leaving the project with entirely unbounded financial exposure. A cost ceiling is also absent. Before this design may proceed, the team must either (a) redesign the topology so EU data remains in EU with US reads served from a read replica that never persists EU PII, or (b) obtain legal sign-off on an applicable transfer mechanism and document it in the design doc, alongside a full egress cost model and a capped infrastructure budget."
+        }
+      ],
+      "outcome": "blocked"
+    }
+  ],
+  "final_outcome": "blocked",
+  "usage": [
+    {
+      "prompt_tokens": 5506,
+      "completion_tokens": 1012,
+      "latency_ms": 24065,
+      "cost_usd": 0.031698,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v2",
+        "replication_topology"
+      ]
+    },
+    {
+      "prompt_tokens": 5502,
+      "completion_tokens": 1010,
+      "latency_ms": 24456,
+      "cost_usd": 0.031656,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v2",
+        "replication_topology"
+      ]
+    },
+    {
+      "prompt_tokens": 5506,
+      "completion_tokens": 871,
+      "latency_ms": 20824,
+      "cost_usd": 0.029583,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v2",
+        "replication_topology"
+      ]
+    },
+    {
+      "prompt_tokens": 5500,
+      "completion_tokens": 890,
+      "latency_ms": 23932,
+      "cost_usd": 0.02985,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v2",
+        "replication_topology"
+      ]
+    }
+  ],
+  "schema_failures": 0,
+  "schema_failure_causes": [],
+  "mode": "agent"
+}

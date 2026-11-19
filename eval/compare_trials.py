@@ -74,6 +74,7 @@ def summarize(trials: list[list[dict]], scenarios: dict[str, dict], scenarios_di
         "latency_sum_s": statistics.mean(sum(u["latency_ms"] for u in r["usage"]) / 1000 for r in runs),
         "latency_max_s": statistics.mean(max(u["latency_ms"] for u in r["usage"]) / 1000 for r in runs),
         "cost": statistics.mean(sum(u["cost_usd"] for u in r["usage"]) for r in runs),
+        "tool_calls": statistics.mean(len(u.get("tool_calls", [])) for r in runs for u in r["usage"]),
         "per_scenario": per_scenario,
     }
 
@@ -115,6 +116,7 @@ def main() -> int:
         "Summed agent latency per scenario": lambda r: f"{r['latency_sum_s']:.0f} s",
         "Slowest agent latency per scenario": lambda r: f"{r['latency_max_s']:.0f} s",
         "Cost per scenario": lambda r: f"${r['cost']:.3f}",
+        "Tool calls per agent": lambda r: f"{r['tool_calls']:.1f}",
     }
     for name, fmt in rows.items():
         print(f"| {name} | " + " | ".join(fmt(results[c]) for c in args.configs) + " |")
