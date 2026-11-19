@@ -1,0 +1,250 @@
+{
+  "scenario_id": "scn_009_clean_observability_dashboard",
+  "run_id": "d157bbd1-b26c-4c05-ad86-488bec16e37b",
+  "started_at": "2026-11-18T21:24:07.163455Z",
+  "finished_at": "2026-11-18T21:24:25.899981Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "medium",
+              "concern_text": "The acceptance criteria define technical thresholds (render time, pipeline coverage, SSO access) but there is no business-level success metric defined. For example: ops team adoption rate, mean-time-to-detect pipeline failures, or reduction in manual triage time. Without this, there is no way to evaluate whether the dashboard actually delivered value post-launch.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "The license quote references a per-seat model but the design doc does not specify how many seats are required, the total cost of the license, or any budget approval. A concrete cost figure with seat count must be documented and approved before proceeding.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "low",
+              "concern_text": "If the ops team expands or new stakeholders are granted access, per-seat licensing costs could grow without a defined ceiling or approval gate. A maximum seat count or spend cap should be established.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "low",
+              "concern_text": "'Covers 100% of pipeline stages currently emitting metrics' is stated but there is no baseline count of pipeline stages documented. Without a numeric baseline, this criterion cannot be objectively verified at release. The metrics inventory should enumerate the exact count of stages to anchor this criterion.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            }
+          ],
+          "reasoning": "The project is well-scoped, read-only in nature, and the design doc is clear about its limited surface area. The three acceptance criteria are largely concrete and testable. However, there are meaningful PM-layer gaps: (1) No business-level success metric exists — the project could technically pass all criteria but fail to change ops behavior or outcomes; (2) The per-seat license cost is not totalized or approved, which is a gate requirement; (3) There is no seat ceiling, leaving cost growth uncontrolled; (4) The '100% of pipeline stages' criterion lacks a documented baseline count to make it verifiable. These are conditions that must be satisfied before the next gate, not blockers requiring redesign, hence the approve-with-conditions decision."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_timeout",
+              "severity": "medium",
+              "concern_text": "The design doc does not mention timeout configuration for the dashboard's queries against the metrics backend. If the settlement pipeline metrics store becomes slow or unresponsive, unbounded queries could cause the dashboard UI to hang, violating the 3-second render acceptance criterion and potentially cascading to backend resources.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_circuit_breaker",
+              "severity": "medium",
+              "concern_text": "No fallback or circuit-breaker pattern is described for dashboard data fetching. If the upstream metrics source is degraded, the dashboard should degrade gracefully (e.g., show stale data with a staleness indicator) rather than failing entirely or blocking ops team access during an incident.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_single_point_of_failure",
+              "severity": "medium",
+              "concern_text": "The design does not address redundancy or availability of the dashboard service itself. For an ops-facing observability tool used during settlement pipeline incidents, a single-instance deployment with no HA or failover plan is a reliability risk.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "The license_quote references a per-seat licensed dashboard tool, but no vendor SLA terms are documented. The availability and support SLA of the dashboard tool should be confirmed and compared against the ops team's availability expectations, especially for incident response use cases.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "low",
+              "concern_text": "No rollback or rollforward procedure is described for the dashboard deployment. Even for a read-only consumer, a bad configuration or version upgrade could render the dashboard unavailable; a documented rollback path should be present before moving to build.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "low",
+              "concern_text": "The design does not mention audit logging for dashboard access. Given this tool surfaces settlement pipeline metrics (a financially sensitive domain), access events should be logged to satisfy internal audit and incident investigation requirements.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "The design is scoped conservatively — read-only metrics consumer, no new data collection, clear and measurable acceptance criteria, and a fixed-cost licensing model. There are no blocking architectural defects and the core design is sound. However, several medium-severity operational maturity gaps must be addressed before build begins: query timeouts must be configured to meet the 3-second render SLA under degraded backend conditions; a graceful degradation or circuit-breaker pattern should be specified for metrics source unavailability; and the dashboard service itself must have an HA or redundancy posture appropriate for an ops-facing incident tool. Additionally, vendor SLA terms for the licensed tool need to be documented. Lower-severity items — rollback plan and audit logging of dashboard access — should be addressed in the detailed design but are not blockers to proceeding conditional on the medium-severity items being resolved."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "medium",
+              "concern_text": "The settlement pipeline is financial infrastructure and likely handles or proxies data adjacent to card transactions. The design doc states 'no PII exposure' but does not include a formal PCI scope assessment confirming the dashboard is out of scope for PCI-DSS. Even a read-only metrics consumer can fall in-scope if metrics contain PANs, CVVs, or cardholder data fragments. A scoping statement is required before go-live.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "medium",
+              "concern_text": "The design doc describes access via existing SSO but does not describe audit logging of dashboard access or query activity. For a financial settlement pipeline, who viewed which metrics and when is a security-sensitive action that should be logged and retained. No mention of audit trail for dashboard user activity is present.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "low",
+              "concern_text": "No retention policy is defined for dashboard access logs or audit trails. Even if audit logging is added, the design must specify a retention duration consistent with regulatory obligations (e.g., 7 years for financial records under SOX, 1 year minimum for PCI). This is absent from the design artifacts.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "The design states the ops team will access via existing SSO but does not define the IAM or RBAC model for the dashboard itself. Without a defined least-privilege model specifying which roles can view which pipeline stages, there is a risk of overbroad read access to sensitive settlement metrics across all pipeline stages for all SSO-authenticated users.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "low",
+              "concern_text": "The design does not address how the dashboard tool stores cached metrics, query results, or session data. If the dashboard caches financial pipeline metrics locally or in a backing store, the encryption posture of that store must be documented, even for read-only data.",
+              "references": [
+                "design_doc_v1",
+                "license_quote"
+              ]
+            }
+          ],
+          "reasoning": "The dashboard is a read-only observability tool consuming existing settlement pipeline metrics. The core design is sound and reasonably scoped. However, several security and privacy controls are unaddressed. The settlement pipeline context introduces PCI-DSS exposure risk that requires a formal scoping statement — the design doc's self-attestation of 'no PII' is insufficient for a financial pipeline without an explicit PCI assessment. Access audit logging is absent, which is a gap for a financial operations tool. The IAM/RBAC model for the dashboard is underspecified, raising overbroad access risk. Retention policy for any generated logs or audit trails is not defined. Finally, the encryption posture of any internal dashboard data storage (caches, sessions) is undocumented. None of these are individually blocking for design gate, but the PCI scoping gap and absent audit logging model should be resolved as conditions of approval before the build gate. The remaining items should be addressed in the security design addendum."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "The license_quote mentions a per-seat license cost but does not document a total cost estimate (number of seats × rate × contract term) for gate approval. A concrete cost figure is required to validate budget alignment before proceeding.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "The dashboard tooling vendor is referenced via a license quote but no vendor SLA terms (uptime guarantees, support tiers, incident response) are documented. For an operational observability dashboard supporting settlement pipeline monitoring, vendor SLA terms must be on record.",
+              "references": [
+                "license_quote",
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "low",
+              "concern_text": "Per-seat licensing can expand as the ops team grows or as access is broadened. There is no documented cap on seat count or maximum spend authorization. A ceiling should be specified to prevent unchecked license cost growth.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "high",
+              "concern_text": "This is a settlement pipeline observability dashboard. Settlement pipelines frequently process or reference payment card data. Even as a read-only metrics consumer, the dashboard must have a documented PCI scope assessment confirming that card data or card-adjacent data (e.g., transaction identifiers) does not flow into metrics or dashboard views. No such assessment is referenced in the artifacts.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "medium",
+              "concern_text": "The design doc does not address audit logging for dashboard access. Given the financial sensitivity of settlement pipeline data, access to this dashboard by ops personnel should generate an audit trail. No audit logging design is documented.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "The project is a read-only observability dashboard for a settlement pipeline, which is a relatively low-risk design scope. The acceptance criteria are measurable and no new data collection is introduced. However, several FinOps and legal concerns must be addressed before full approval: (1) A complete cost estimate with seat count, rate, and term must be documented—the license_quote alone is insufficient. (2) Vendor SLA terms for the dashboard tooling must be on record given its operational role. (3) A per-seat licensing model without a spend ceiling creates unbounded cost exposure as access grows. (4) Most critically, settlement pipelines are high-probability PCI scope environments; the design must include an explicit PCI scope assessment confirming card data does not appear in any metric label, tag, or dashboard field. (5) Dashboard access to financially sensitive operational data should be audit-logged. These concerns are addressable without redesign and do not block the project outright, but conditions must be met before the build gate."
+        }
+      ],
+      "outcome": "approved_with_conditions"
+    }
+  ],
+  "final_outcome": "approved_with_conditions",
+  "usage": [
+    {
+      "prompt_tokens": 2137,
+      "completion_tokens": 558,
+      "latency_ms": 14545,
+      "cost_usd": 0.014781,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2135,
+      "completion_tokens": 732,
+      "latency_ms": 16567,
+      "cost_usd": 0.017385,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2137,
+      "completion_tokens": 772,
+      "latency_ms": 18695,
+      "cost_usd": 0.017991,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2134,
+      "completion_tokens": 689,
+      "latency_ms": 16247,
+      "cost_usd": 0.016737,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    }
+  ],
+  "schema_failures": 0,
+  "schema_failure_causes": [],
+  "mode": "control"
+}

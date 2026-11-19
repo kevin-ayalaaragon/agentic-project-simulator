@@ -1,0 +1,225 @@
+{
+  "scenario_id": "scn_010_clean_db_index_addition",
+  "run_id": "c4149b14-7324-46b4-bbb0-5560756e1a5b",
+  "started_at": "2026-11-18T21:31:23.370599Z",
+  "finished_at": "2026-11-18T21:31:45.166843Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "The query performance analysis references an index size estimate, but neither that document nor the design doc provides a concrete storage cost figure or confirms it was reviewed against a budget ceiling. The acceptance criterion caps storage overhead at 8%, but no cost estimate in absolute terms (dollars or storage GiB) is documented at the gate.",
+              "references": [
+                "design_doc_v1",
+                "query_performance_analysis"
+              ]
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "low",
+              "concern_text": "The acceptance criterion 'Index build completes with zero downtime' lacks a testable definition: how is 'zero downtime' measured? A specific metric (e.g., zero increase in error rate, zero replication lag breach, p99 availability stays above X%) should be attached to make this criterion objectively passable or failsable.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "low",
+              "concern_text": "The rollback plan is described only as 'documented' with no summary of trigger conditions, estimated rollback time, or owner. As PM I cannot confirm the rollback plan is actionable. The gate artifact should include at minimum: trigger thresholds (e.g., p99 > 800ms after cutover), responsible party, and estimated time-to-revert.",
+              "references": [
+                "rollback_plan"
+              ]
+            }
+          ],
+          "reasoning": "The project is well-scoped and tightly focused on a single infrastructure improvement (composite index addition on the transactions table) with no API changes and no security implications called out. The two quantitative acceptance criteria — p99 dropping below 100ms and storage overhead under 8% — are strong and numeric. The online schema change approach is appropriate for a zero-downtime goal. No dependency or sequencing issues are evident. Three concerns were raised: (1) a missing concrete cost estimate in absolute terms beyond the 8% storage ratio, which should be confirmed before production rollout; (2) the 'zero downtime' criterion needs an objective measurement definition so QA can pass or fail it unambiguously; (3) the rollback plan artifact content is too thin to verify it is truly actionable — trigger thresholds and an owner must be explicit. None of these are blocking, but conditions (1) and (3) should be resolved before the release proceeds to execution, and (2) should be clarified before QA sign-off."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "The query_performance_analysis mentions an index size estimate, but neither that artifact nor the design_doc_v1 contains a concrete, numeric storage overhead estimate (e.g., current table size × expected index ratio) that can be verified against the 8% acceptance criterion. The estimate must be explicitly stated before build begins.",
+              "references": [
+                "query_performance_analysis",
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "medium",
+              "concern_text": "The acceptance criterion 'Index build completes with zero downtime' lacks a testable, numeric definition. 'Zero downtime' should specify: max allowed replication lag during build, whether read replicas are included in scope, and how compliance will be verified (e.g., monitoring alert thresholds, specific tool health checks). Without this, the criterion cannot be objectively passed or failed.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "low",
+              "concern_text": "The design doc states 'no security implications' without substantiation. The transactions table almost certainly contains financial and potentially PII data. A brief confirmation that the index change does not expose new query patterns, logging artifacts, or query plan caches containing sensitive values should be documented explicitly.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "low",
+              "concern_text": "The rollback plan is described only as 'documented' with no details on the rollback procedure's mechanics (e.g., DROP INDEX CONCURRENTLY, estimated duration, impact on write throughput during rollback, or who is authorized to trigger it). The artifact should be expanded to include step-by-step instructions and go/no-go criteria.",
+              "references": [
+                "rollback_plan"
+              ]
+            }
+          ],
+          "reasoning": "The design is narrow and well-scoped — adding two composite indexes via an online schema change tool with a documented rollback plan. Architecturally this is low-risk. The acceptance criteria are mostly measurable, but 'zero downtime' needs an operational, testable definition. The storage overhead acceptance criterion (under 8%) is not backed by a concrete numeric estimate in any artifact, which is a gap before sign-off. The rollback plan exists but lacks enough procedural detail to be actionable under incident conditions. No reliability, dependency, or sequencing concerns are identified given the non-API, non-service-boundary nature of the change. Approving with conditions on (1) publishing the numeric index-size estimate relative to table size, and (2) clarifying the testable definition of 'zero downtime' before the build gate."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "high",
+              "concern_text": "The project operates on a 'transactions' table, which may contain payment card data or cardholder information. The design doc explicitly states 'no security implications' without any evidence of a PCI-DSS scope assessment. Any index change on a table that is in-scope for PCI-DSS (or could be) requires a formal scoping review to confirm the index build, tooling access, and any temporary artifacts (e.g., shadow tables from the online schema change tool) do not expand or violate the cardholder data environment (CDE) boundary.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "medium",
+              "concern_text": "Online schema change tools (e.g., pt-online-schema-change, gh-ost) typically log query fragments, row samples, or progress details during execution. The design doc asserts 'no security implications' but provides no evidence that the OSC tooling's logging has been reviewed and configured to suppress or redact any PII or card data that could appear in progress logs, error output, or audit trails for the transactions table.",
+              "references": [
+                "design_doc_v1",
+                "rollback_plan"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "medium",
+              "concern_text": "Adding indexes to a production transactions table is a schema-level DDL change on what is likely a security-sensitive data store. There is no mention in the design doc or rollback plan of ensuring that the DDL operations (CREATE INDEX, DROP INDEX) are captured in a database audit log, or that access by the deployment service account performing the online schema change is recorded for compliance purposes.",
+              "references": [
+                "design_doc_v1",
+                "rollback_plan"
+              ]
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "The design references use of an online schema change tool but does not describe what database credentials or IAM/RBAC roles are granted to the account executing the index build. Online schema change tools typically require elevated DB privileges (e.g., ALTER, CREATE, DROP, SELECT, INSERT on the target table or its shadow copies). There is no documentation confirming these permissions are scoped minimally and revoked or rotated post-deployment.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "The design doc is minimal and self-declares 'no security implications,' but several security and privacy concerns arise from the nature of the target table ('transactions') and the use of an online schema change tool. The most significant concern is the absence of any PCI-DSS scoping review — a transactions table is a high-probability candidate for cardholder data environment inclusion, and no scope assessment is documented. Additionally, the online schema change tooling creates temporary shadow tables and verbose logs that may inadvertently expose PII or card data; no log redaction controls are mentioned. DDL changes of this nature on sensitive tables should be captured in audit logs, and the credentials used to perform the online schema change should follow least-privilege principles with post-deployment revocation — neither is addressed. These issues do not necessarily block delivery but must be resolved or formally accepted before production execution. I am recommending approve_with_conditions pending: (1) a PCI scope attestation or formal out-of-scope declaration, (2) review and configuration of OSC tooling logs to prevent PII/card data leakage, (3) confirmation of audit logging for the DDL operations, and (4) documentation of the minimum-privilege service account used for the schema change."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "The query performance analysis references an estimated index size but neither the design doc nor the analysis provides a concrete storage cost estimate (e.g., GB added × $/GB) or confirms the estimate is below any approved cost threshold. A numeric cost figure must be validated before the rollout proceeds.",
+              "references": [
+                "design_doc_v1",
+                "query_performance_analysis"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "low",
+              "concern_text": "The online schema change tool may consume additional I/O, CPU, or temporary disk space during the index build. No cap or throttle limit on resource consumption during the build window is documented, creating a risk of unbounded transient infrastructure cost spikes.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "low",
+              "concern_text": "The transactions table likely contains financial (and potentially PII) data. Neither the design doc nor any artifact confirms whether encryption-at-rest is already in place for the table, or whether the new indexes inherit the same encryption settings. This should be explicitly confirmed as in-scope or out-of-scope.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "low",
+              "concern_text": "The design references use of an 'online schema change tool' but does not name it or provide vendor/license/SLA terms. If this is a third-party managed service or a licensed tool, its SLA and license terms must be on record before production use.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "This is a narrowly scoped database index optimization with a documented rollback plan and no API or security changes called out. From a FinOps and Legal perspective the project is largely low-risk, but four concerns require resolution before full approval. First, while an index size estimate exists it has not been translated into a concrete cost figure with a confirmed ceiling, satisfying def_missing_cost_estimate. Second, the online schema change tool's resource throttle limits are undocumented, leaving open the possibility of unbounded transient cost during the build (def_no_cost_ceiling). Third, the transactions table is financial data and no artifact explicitly confirms encryption-at-rest inheritance for the new indexes — this should be a one-line confirmation. Fourth, the specific online schema change tooling is unnamed, so its license compatibility and any vendor SLA cannot be verified (def_missing_vendor_sla). None of these concerns are individually blocking, but the cost estimate gap is medium severity and must be resolved prior to production scheduling. The other three are low-severity and can be resolved via a brief addendum to the design doc."
+        }
+      ],
+      "outcome": "approved_with_conditions"
+    }
+  ],
+  "final_outcome": "approved_with_conditions",
+  "usage": [
+    {
+      "prompt_tokens": 5656,
+      "completion_tokens": 712,
+      "latency_ms": 17658,
+      "cost_usd": 0.027648,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v1",
+        "query_performance_analysis",
+        "rollback_plan"
+      ]
+    },
+    {
+      "prompt_tokens": 5652,
+      "completion_tokens": 765,
+      "latency_ms": 17154,
+      "cost_usd": 0.028431,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v1",
+        "query_performance_analysis",
+        "rollback_plan"
+      ]
+    },
+    {
+      "prompt_tokens": 5656,
+      "completion_tokens": 969,
+      "latency_ms": 21751,
+      "cost_usd": 0.031503,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v1",
+        "query_performance_analysis",
+        "rollback_plan"
+      ]
+    },
+    {
+      "prompt_tokens": 5650,
+      "completion_tokens": 777,
+      "latency_ms": 18448,
+      "cost_usd": 0.028605,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v1",
+        "query_performance_analysis",
+        "rollback_plan"
+      ]
+    }
+  ],
+  "schema_failures": 0,
+  "schema_failure_causes": [],
+  "mode": "agent"
+}

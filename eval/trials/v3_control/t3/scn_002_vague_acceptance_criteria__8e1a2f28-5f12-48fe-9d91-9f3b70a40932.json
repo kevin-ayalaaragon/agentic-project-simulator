@@ -1,0 +1,252 @@
+{
+  "scenario_id": "scn_002_vague_acceptance_criteria",
+  "run_id": "8e1a2f28-5f12-48fe-9d91-9f3b70a40932",
+  "started_at": "2026-11-18T21:30:34.472693Z",
+  "finished_at": "2026-11-18T21:30:51.743225Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "All three acceptance criteria are purely subjective and contain no numeric thresholds or testable definitions. 'Customers love the new checkout', 'conversion improves significantly', and 'page feels fast' cannot be objectively evaluated at release or post-launch. Each criterion must be replaced with a measurable target (e.g., checkout conversion rate increases by ≥X%, p75 page load time ≤Xms, CSAT score ≥X).",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "blocking",
+              "concern_text": "There is no defined success metric with a numeric baseline and target that would allow the team to declare the project a success or failure. Without a measurable success metric, go/no-go decisions at launch and retrospective evaluation are impossible.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_scope_too_broad",
+              "severity": "high",
+              "concern_text": "The PRD bundles six distinct feature areas into a single design gate submission. This dramatically increases review complexity, coordination risk, and the blast radius of a rollback. Best practice is to decompose into independently releasable increments, each with their own acceptance criteria and rollback plans.",
+              "references": [
+                "prd_v2"
+              ]
+            }
+          ],
+          "reasoning": "This project cannot pass the design gate in its current state. The acceptance criteria are entirely unmeasurable — none of the three stated criteria contain numeric thresholds, baselines, or testable conditions. This is a blocking defect because the team will have no objective basis to determine whether the initiative succeeded, to make a launch decision, or to evaluate post-release performance. Closely related, the PRD lacks any defined success metric with a baseline and target, compounding the measurement problem. Additionally, packaging six feature areas into a single gate submission creates unmanageable scope. Each area likely has distinct dependencies, rollback procedures, and risk profiles that are obscured when bundled together. The team should return with: (1) measurable acceptance criteria including numeric targets for conversion rate, performance, and customer satisfaction; (2) explicit success metrics with current baselines; and (3) a phased or decomposed scope plan that allows independent validation and rollback of each feature area."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "All three acceptance criteria ('customers love the new checkout', 'conversion improves significantly', 'page feels fast') lack numeric thresholds or testable definitions. There is no way to programmatically or objectively determine whether the release has succeeded. These must be replaced with measurable targets (e.g., conversion rate +X%, p75 LCP < Yms, NPS >= Z) before proceeding.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_scope_too_broad",
+              "severity": "high",
+              "concern_text": "The PRD bundles six distinct feature areas into a single initiative at one gate. This increases blast radius on rollback, complicates root-cause analysis if metrics regress, and makes it difficult to attribute impact to any individual change. Feature areas should be decomposed into independently releasable units.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "high",
+              "concern_text": "No rollback procedure is documented anywhere in the submitted artifacts. For a checkout flow, partial failures can directly impact revenue. Each feature area, and the initiative as a whole, needs a documented rollback or feature-flag kill-switch strategy.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "blocking",
+              "concern_text": "Beyond the vague acceptance criteria, no concrete success metrics with baselines, measurement windows, or owners are defined. Without these, there is no signal to gate a production rollout or to trigger a rollback decision.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_timeline_revision",
+              "severity": "medium",
+              "concern_text": "Six feature areas are scoped in a single gate with no staffing or timeline breakdown provided. It is not possible to assess whether the delivery timeline is realistic for this volume of work, or whether dependencies between feature areas have been sequenced.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "Checkout flows typically handle payment card data. No PCI scope assessment or cardholder data flow diagram is included in the submitted artifacts. If any of the six feature areas touches card data or payment form rendering, a PCI scope review is required before design approval.",
+              "references": [
+                "prd_v2"
+              ]
+            }
+          ],
+          "reasoning": "The design artifacts are not ready to pass this gate. The most critical blockers are: (1) all acceptance criteria are entirely unmeasurable — 'love', 'significantly', and 'feels fast' are not testable; (2) no success metrics with numeric baselines or measurement windows are defined; and (3) checkout touches payment flows but no PCI scope assessment has been submitted. Additionally, six feature areas bundled together create a high rollback risk, especially with no rollback or kill-switch plan documented. The timeline has not been validated against the expanded scope. The team must decompose the initiative, define measurable criteria with explicit thresholds and owners, provide a PCI scope attestation, and document rollback procedures for each workstream before resubmission."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "blocking",
+              "concern_text": "Checkout improvements directly touch payment flows, yet there is no mention of a PCI-DSS scope assessment. Any change to systems that handle, transmit, or display card data must be reviewed for PCI scope impact before design is approved.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "high",
+              "concern_text": "The PRD describes no audit-logging requirements for security-sensitive checkout actions (e.g., payment method changes, address updates, order submission). These events must be audit-logged to support fraud investigation and regulatory enquiries.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_pii_in_logs",
+              "severity": "high",
+              "concern_text": "The design makes no mention of PII redaction strategy for checkout-related logging. Checkout flows routinely expose card numbers, billing addresses, and email addresses; without explicit redaction controls these will appear in logs.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "high",
+              "concern_text": "There is no statement about encryption-at-rest for any checkout data stores (session state, order drafts, payment tokens). Sensitive payment and PII data must be encrypted at rest and the design should document the mechanism.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_gdpr_residency",
+              "severity": "medium",
+              "concern_text": "No data-residency controls are mentioned for EU customer data processed during checkout. If the deployment spans regions, EU PII and payment data must stay within EU-approved boundaries or a legal transfer mechanism must be documented.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_transfer_mechanism",
+              "severity": "medium",
+              "concern_text": "No cross-border data transfer mechanism (SCCs, adequacy decision, etc.) is documented. With a multi-region checkout service this is a legal requirement under GDPR for any EU user data leaving the EEA.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_no_log_retention",
+              "severity": "medium",
+              "concern_text": "The PRD does not specify log retention policies for checkout logs. Regulatory requirements (PCI-DSS, GDPR) mandate defined retention and deletion schedules; absence of policy is a compliance gap.",
+              "references": [
+                "prd_v2"
+              ]
+            }
+          ],
+          "reasoning": "The Checkout Improvements Q1 PRD v2 presents several material security and privacy gaps that must be addressed before design approval. Most critically, checkout inherently touches payment card data, yet no PCI-DSS scope assessment has been performed or referenced — this is a blocking issue. Beyond PCI, the design is silent on audit logging of security-sensitive actions, PII redaction in logs, and encryption-at-rest for checkout data stores. For EU compliance, there is no documented data-residency strategy or cross-border transfer mechanism. Log retention is also unaddressed. I am voting approve_with_conditions: the team may continue design work, but the blocking PCI scope review must be completed and all high/medium findings remediated before moving to the build gate."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "block",
+          "concerns": [
+            {
+              "defect_id": "def_unmeasurable_acceptance_criteria",
+              "severity": "blocking",
+              "concern_text": "All three acceptance criteria ('customers love the new checkout', 'conversion improves significantly', 'page feels fast') lack numeric thresholds or testable definitions. None of these can be objectively verified at any gate or sign-off. This must be remediated before the project can proceed.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_success_metric",
+              "severity": "blocking",
+              "concern_text": "No measurable success metrics are defined anywhere in prd_v2. Without quantified targets (e.g., conversion rate delta, p95 page load time, NPS score), there is no basis for evaluating ROI or FinOps cost-benefit analysis.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_scope_too_broad",
+              "severity": "high",
+              "concern_text": "The PRD bundles six distinct feature areas into a single initiative at design gate. This increases risk of cost overruns, makes incremental rollback impractical, and obscures per-feature cost attribution.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "high",
+              "concern_text": "No cost estimate is provided in prd_v2 for infrastructure, third-party services, or engineering effort across any of the six feature areas. A FinOps review cannot be completed without at least rough order-of-magnitude figures.",
+              "references": [
+                "prd_v2"
+              ]
+            },
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "high",
+              "concern_text": "The initiative covers checkout, which typically involves payment card data flows. No PCI scope assessment or cardholder data environment (CDE) scoping document is referenced in prd_v2. This is a legal and compliance blocker if card data is in scope.",
+              "references": [
+                "prd_v2"
+              ]
+            }
+          ],
+          "reasoning": "prd_v2 presents a checkout improvements initiative that fails on multiple FinOps and legal dimensions. First and most critically, every acceptance criterion is subjective and unmeasurable, making it impossible to define a cost-justified success baseline or audit gate exit. Second, no cost estimate, cost ceiling, or unit economics model is present for any of the six bundled feature areas, preventing any responsible FinOps sign-off. Third, the six-feature-area scope bundled into one gate obscures per-feature cost attribution and rollback feasibility. Finally, checkout inherently touches payment flows; the absence of any PCI scope assessment is a legal compliance concern that must be addressed before design is finalized. I am blocking this initiative until: (1) all acceptance criteria are rewritten with numeric, testable thresholds; (2) a cost estimate and cost ceiling are provided; (3) a PCI scope review is completed or explicitly determined to be out of scope with justification; and (4) consideration is given to sequencing the six feature areas into smaller, independently gated releases."
+        }
+      ],
+      "outcome": "blocked"
+    }
+  ],
+  "final_outcome": "blocked",
+  "usage": [
+    {
+      "prompt_tokens": 2071,
+      "completion_tokens": 540,
+      "latency_ms": 12508,
+      "cost_usd": 0.014313,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2069,
+      "completion_tokens": 744,
+      "latency_ms": 17233,
+      "cost_usd": 0.017367,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2071,
+      "completion_tokens": 755,
+      "latency_ms": 16480,
+      "cost_usd": 0.017538,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    },
+    {
+      "prompt_tokens": 2068,
+      "completion_tokens": 701,
+      "latency_ms": 14555,
+      "cost_usd": 0.016719,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": []
+    }
+  ],
+  "schema_failures": 0,
+  "schema_failure_causes": [],
+  "mode": "control"
+}

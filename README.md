@@ -2,7 +2,7 @@
 
 A multi-agent simulator that runs proposed software projects through a gated lifecycle review (design, architecture, build, launch readiness) with role-scoped LLM stakeholders playing the four roles that typically gate-keep real engineering programs: a product manager, an engineering lead, a security/privacy reviewer, and a FinOps/legal reviewer. The simulator's purpose is twofold. As a system, it stress-tests project plans by surfacing the concerns a real cross-functional review would raise. As an evaluation target, it provides a structured environment for measuring how well a stochastic multi-agent system can detect known defects, stay in role, and stay grounded under varying prompt and grounding strategies.
 
-The repository includes the simulator itself, a fixed suite of 10 fintech/payments project scenarios with seeded defects, and a five-layer evaluation harness that produces master tables comparing the baseline (V1) and constrained-decoding (V2) configurations.
+The repository includes the simulator itself, a fixed suite of 10 fintech/payments project scenarios with seeded defects, and a five-layer evaluation harness that produces master tables comparing V1 (baseline), V2 (structured outputs), and V3 (tool-calling agents vs. in-prompt context).
 
 ## Baseline Results (V1)
 
@@ -24,27 +24,49 @@ The two recall numbers report the same underlying behavior at different measurem
 
 Strict precision is reported as a floor, not a truth. It treats every concern that does not match a seeded defect ID as a false positive. The L4 judge decomposes that floor: of the unmatched flags across the suite, 76% were judged as legitimate in-persona catches of gaps not seeded in ground truth, 17% as partially in-role, and 6% as persona drift. True noise is a small minority of what the strict number counts against the system.
 
-## V2 Results: Constrained Decoding
+## V2 Results: Structured Outputs
 
-V2 replaces JSON-in-prompt with grammar-constrained structured outputs. The API compiles the Pydantic schema into the decoding grammar, narrowed per call to the calling role, the gate, and the 29-ID defect catalog, so an agent cannot emit a defect ID outside the catalog. Role reviews run concurrently (sectioning) and aggregate through the unchanged deterministic gate rule. Each configuration ran 3 trials of the 10 scenarios. Recall differences are paired by scenario and bootstrapped over the 7 scenarios that seed defects, since trials of one scenario are not independent.
+V2 swaps JSON-in-prompt for grammar-constrained structured outputs. The Pydantic schema, narrowed per call to the role, the gate, and the 29-ID defect catalog, compiles into the decoding grammar, so off-catalog defect IDs cannot be emitted. Role reviews run in parallel (sectioning); the deterministic gate rule is unchanged. Each configuration ran 3 trials × 10 scenarios; recall deltas are paired by scenario and bootstrapped over the 7 defect-seeded scenarios.
 
 | Metric | V1 (JSON in prompt) | V2 initial | V2 final (all fields required) |
 |--------|---------------------|------------|--------------------------------|
 | Format pass rate | 120/120 | 119/120 | 120/120 |
-| Failed attempts (retries) | 4 | 4 (3 validation, 1 max_tokens) | 0 |
+| Schema retries | 4 | 4 (3 validation, 1 max_tokens) | 0 |
 | Tagged recall, mean of 3 trials (SD) | 0.95 (0.04) | 0.81 (0.05) | 0.91 (0.05) |
-| Recall change vs V1, paired by scenario [95% CI] | n/a | -0.14 [-0.40, +0.04] | -0.04 [-0.12, +0.05] |
+| Recall change vs V1, paired [95% CI] | n/a | -0.14 [-0.40, +0.04] | -0.04 [-0.12, +0.05] |
 | Seeded defects caught in all 3 trials | 14/16 | 11/16 | 12/16 |
 | Strict precision | 0.11 to 0.12 | 0.10 to 0.11 | 0.10 to 0.11 |
 | Gate outcome matches expected | 21/30 | 21/30 | 21/30 |
-| Wall time per scenario (approx.) | 92 s, sequential | 23 s, parallel | 21 s, parallel |
+| Wall time per scenario | 92 s, sequential | 23 s, parallel | 21 s, parallel |
 | Cost per scenario | $0.079 | $0.073 | $0.074 |
 
-**The harness caught a regression.** The initial V2 missed both seeded defects in `scn_007` in all three trials (V1 caught 5 of 6) and raised 26% fewer concerns per run. Structured outputs emit required properties before optional ones. Because `concerns` was optional, the model wrote its decision and summary reasoning before listing concerns, the reverse of V1's order. Making every field required restored concern-first order: `scn_007` recovered in 2 of 3 trials, and suite recall moved to within 0.04 of V1, an interval that includes no change.
+**Regression caught by the eval harness.** Initial V2 missed both `scn_007` defects in 3 of 3 trials (V1 caught 5 of 6) and emitted 26% fewer concerns. Cause: structured outputs emit required fields before optional ones, so the optional `concerns` list came after the summary `reasoning`. Fix: every field required. `scn_007` recovered in 2 of 3 trials, and recall moved to within 0.04 of V1.
 
-**Limits of the comparison.** Seven scenarios with seeded defects is a small sample, so the intervals are wide and only large effects are detectable. V2 final versus V1 is consistent with parity, not proof of it. Enum casing is normalized before scoring, and a wrong-but-valid catalog ID remains possible; strict precision measures that.
+**Limits.** Seven defect-seeded scenarios give wide intervals and detect only large effects; V2 final vs V1 is consistent with parity, not proof of it. A wrong-but-valid catalog ID is still possible, and strict precision measures it.
 
-**Eval integrity.** Claude Code permission deny rules block the coding agent's edit tools from modifying the answer key (scenarios, defect catalog, human labels, V1 runs), a guard against the test tampering documented in coding agents. A Stop hook runs the offline contract tests and keeps a turn from ending while they fail, and CI runs the same tests with read-only permissions and no secrets. All 90 run files behind this table are in `eval/trials/`, and `python -m eval.compare_trials` recomputes every number in it, including the paired intervals.
+## V3 Results: Tool-Calling Agents vs. In-Prompt Context
+
+V3 asks whether an agent harness with tool calling beats putting the same context in the prompt. Each scenario's artifacts now have short text in `eval/artifacts.yaml`, model-written from the scenario description with nothing taken from the seeded defects; a test enforces the second part. Control puts the artifact text in the prompt. Agent mode lists artifact names only and gives each role a strict `read_artifact` tool (input enum limited to that scenario's artifacts) in a tool-calling loop capped at 6 rounds; final answers keep structured outputs. Each mode ran 3 trials × 10 scenarios.
+
+| Metric | V2 final (no artifact text) | Control (in prompt) | Agent (tool calling) |
+|--------|-----------------------------|---------------------|----------------------|
+| Tagged recall, mean of 3 trials (SD) | 0.91 (0.05) | 1.00 (0.00) | 1.00 (0.00) |
+| Recall change vs V2, paired [95% CI] | n/a | +0.09 [+0.02, +0.18] | +0.09 [+0.02, +0.18] |
+| Seeded defects caught in all 3 trials | 12/16 | 16/16 | 16/16 |
+| Strict precision | 0.10 to 0.11 | 0.21 to 0.22 | 0.22 to 0.24 |
+| Tool calls per role call | 0 | 0 | 2.4 (every artifact, 120 of 120) |
+| Slowest role call per scenario | 21 s | 20 s | 24 s |
+| Cost per scenario | $0.074 | $0.072 | $0.126 |
+
+**Context, not tool calling, drove the gain.** Recall reached 1.00 and strict precision roughly doubled once artifact text was available, in either mode. The agents read every listed artifact on all 120 role calls, so the tool loop added no selectivity: identical recall at 75% higher cost and 20% higher latency. At one to three short artifacts per scenario, in-prompt context is the better design; tool-based retrieval earns its cost when context is too large to include or too numerous to read in full.
+
+**Limits.** Recall is saturated, so this suite no longer separates the modes on recall; harder scenarios are the next step. Model-written artifacts that restate plainly worded descriptions make detection easier than real documents would. Gate-outcome accuracy is unchanged at 21/30 because the clean scenarios still draw approve-with-conditions votes.
+
+## Eval Integrity and Reproducibility
+
+- **Answer key protected.** Claude Code permission deny rules block the coding agent's edit tools from changing scenarios, the defect catalog, artifacts, human labels, and recorded runs, a guard against test tampering by coding agents.
+- **Regression gate.** A Stop hook keeps a Claude Code turn open while the offline tests fail. CI runs the same tests (output contract, tool loop, artifact-leak check) with read-only permissions and no secrets.
+- **Reproducible.** `python -m eval.compare_trials --baseline v2 --configs v2 v3_control v3_agent` recomputes every V2 and V3 number from the 150 runs in `eval/trials/`.
 
 ## Architecture
 
@@ -59,7 +81,7 @@ The system has two layers: the simulator (which runs scenarios) and the evaluati
 | | L5: Groundedness | Rate of assertions traceable to project state or retrieved context |
 | | Cost | Dollars per full lifecycle simulation |
 
-Phase 1 (V1 baseline) implements L1, L2, and cost. The L4 persona judge shipped ahead of schedule with human-validated calibration. V2 changed how outputs are decoded (see V2 Results); L3 (retrieval) and L5 (groundedness) are not built yet.
+Phase 1 (V1 baseline) implements L1, L2, and cost. The L4 persona judge shipped ahead of schedule with human-validated calibration. V2 changed how outputs are decoded and V3 tested tool-calling agents against in-prompt context (see V2 and V3 Results); L3 (retrieval) and L5 (groundedness) are not built yet.
 
 ## Methodology
 
@@ -81,12 +103,12 @@ A few design decisions matter more than the numbers themselves, and are worth un
 
 ## Open Targets
 
-V2 closed the first V1 failure mode below; the rest are open.
+Status of the V1 failure modes after V2 and V3:
 
 - Done in V2: L1 retries fell from 4 across three V1 trials to 0 across three V2 trials (120 agent calls each) with grammar-constrained structured outputs (V2 Results).
-- Tagged recall should match true recall (0.93 vs 1.00 in V1) once concerns are constrained to one defect each.
-- Strict precision (0.10 to 0.11 in both V1 and V2) should improve with two interventions: a retrieval layer that grounds agents in gate-specific playbooks (so they raise concerns from documented review patterns rather than from generic best-practice prior), and persona-prompt tightening now targeted by the measured drift asymmetry (PM at 0.55 and engineering lead at 0.63 in-persona are the weak prompts; their dominant leak directions are documented above).
-- A separate cross-cutting "release coordinator" agent will be evaluated for systemic concerns (dependency cycles, sequencing, multi-service coordination) that the four role-scoped agents reliably miss on raw prompting.
+- Tagged recall matched true recall (1.00) in V3 once artifact text was available; the one-defect-per-concern constraint is still unbuilt and matters once harder scenarios move recall off the ceiling.
+- Strict precision rose from 0.10 to 0.11 in V1 and V2 to 0.21 to 0.24 in V3 once artifact text was available. The remaining lever is persona-prompt tightening now targeted by the measured drift asymmetry (PM at 0.55 and engineering lead at 0.63 in-persona are the weak prompts; their dominant leak directions are documented above).
+- A cross-cutting "release coordinator" agent for systemic concerns (dependency cycles, sequencing, multi-service coordination) is lower priority: the roles missed `scn_007` from project state alone (initial V2: 0 of 6), but caught it in 3 of 3 V3 trials once artifact text was available.
 
 ## Repository Layout
 
@@ -96,9 +118,10 @@ V2 closed the first V1 failure mode below; the rest are open.
 │   └── schemas.py              # Pydantic models shared by the simulator and harness
 ├── eval/
 │   ├── defect_catalog.yaml     # 29 canonical defect IDs
+│   ├── artifacts.yaml          # Artifact text for V3 (model-written from scenario descriptions)
 │   ├── scenarios/              # 10 YAML test fixtures
 │   ├── runners/
-│   │   └── run_scenario.py     # Executes one scenario through the agent system
+│   │   └── run_scenario.py     # Runs one scenario; --mode v2, control, or agent
 │   ├── metrics/
 │   │   ├── schema.py           # L1 scorer
 │   │   ├── defects.py          # L2 scorer
@@ -107,12 +130,12 @@ V2 closed the first V1 failure mode below; the rest are open.
 │   │   ├── persona_judge.py    # L4 discrete-rubric judge
 │   │   └── judge_validation/   # 45 human-labeled turns + agreement scorer
 │   ├── runs/                   # V1 baseline ScenarioRun JSONs (read-only)
-│   ├── trials/                 # 3-trial runs behind the V2 Results table
+│   ├── trials/                 # 3-trial runs behind the V2 and V3 Results tables
 │   ├── runs_persona/           # Per-scenario judge verdicts
 │   ├── report.py               # Aggregates L1 + L2 into the master table
-│   ├── compare_trials.py       # Recomputes the V2 Results table from eval/trials/
+│   ├── compare_trials.py       # Recomputes the V2 and V3 Results tables from eval/trials/
 │   └── report.md               # Latest generated report
-├── tests/                      # Offline contract tests (no API calls), run in CI
+├── tests/                      # Offline tests (output contract, tool loop, artifact leaks), run in CI
 ├── .github/workflows/ci.yml    # Runs the tests on push and pull request
 ├── .claude/settings.json       # Claude Code permission rules and Stop-hook test gate
 ├── CLAUDE.md                   # Commands and rules for Claude Code sessions
@@ -135,10 +158,10 @@ Run the offline tests (no API key needed):
 python -m pytest -q
 ```
 
-Run one scenario (writes to `eval/runs_v2/`; `eval/runs/` holds the V1 baseline):
+Run one scenario (writes to `eval/runs_v2/`; `eval/runs/` holds the V1 baseline). `--mode control` adds artifact text to the prompt; `--mode agent` gives the roles the `read_artifact` tool:
 
 ```bash
-python -m eval.runners.run_scenario eval/scenarios/scn_001_pii_logging.yaml
+python -m eval.runners.run_scenario eval/scenarios/scn_001_pii_logging.yaml --mode agent
 ```
 
 Run the full suite:
@@ -153,6 +176,7 @@ Score and generate the report (`--runs-dir eval/runs` scores the V1 baseline):
 
 ```bash
 python -m eval.report --runs-dir eval/runs_v2 --out eval/report_v2.md
+python -m eval.compare_trials --baseline v2 --configs v2 v3_control v3_agent
 ```
 
 Judge persona fidelity and validate the judge (L4):

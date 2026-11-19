@@ -1,0 +1,112 @@
+# Artifact text the agents can read, keyed by scenario ID and artifact name.
+# Each entry restates facts from that scenario's description only; nothing is
+# taken from seeded_defects, so the answer key does not leak into the inputs.
+
+scn_001_pii_logging:
+  design_doc_v1: |
+    Fraud-detection service, design v1. The service scores card transactions
+    for fraud. For debugging, request handlers log the full card number and
+    the customer name to CloudWatch. Logging section: no redaction layer is
+    described. The document does not discuss handling of personal data.
+  data_flow_diagram: |
+    Data flow: card transaction request -> fraud scoring service -> score
+    returned to caller. Side flow: scoring service -> CloudWatch log group
+    (full card number, customer name). Log group retention: not specified.
+
+scn_002_vague_acceptance_criteria:
+  prd_v2: |
+    Checkout improvements initiative, PRD v2, submitted for design review.
+    Scope covers six feature areas in one initiative. Acceptance criteria:
+    customers love the new checkout; conversion improves significantly; the
+    page feels fast. No measurable thresholds are given for any criterion.
+
+scn_003_synchronous_vendor_call_in_checkout:
+  system_architecture_v1.0: |
+    Checkout service architecture v1.0. During checkout the service calls a
+    third-party AML screening vendor on the critical path. The call is
+    synchronous and blocking. Vendor SLA: 99.5%. Resilience section: no
+    timeout, no circuit breaker, and no asynchronous fallback are defined.
+  sequence_diagram: |
+    Sequence: customer submits order -> checkout service -> AML screening
+    vendor (synchronous call, checkout waits) -> vendor response -> order
+    confirmation. No alternate path is shown for a slow or failed vendor call.
+
+scn_004_unbounded_compute_for_reconciliation:
+  design_doc_v3: |
+    Daily settlement reconciliation v2, design v3. A nightly job reconciles
+    settlement records on an autoscaling cluster. Autoscaling has no maximum
+    node cap. Volume: the job historically processes 40M to 200M records,
+    depending on the day. Cost model: TBD.
+  cost_estimate_TBD: |
+    Cost estimate placeholder. Status: TBD. No figures provided.
+
+scn_005_cross_border_data_residency:
+  design_doc_v2: |
+    Customer profile service, design v2. Proposes replicating EU customer
+    data to a US-East primary for latency reasons. GDPR is mentioned once, in
+    passing. Data residency and the cross-border transfer mechanism are not
+    addressed.
+  replication_topology: |
+    Replication topology: EU customer profile data -> US-East primary.
+    Rationale given: latency.
+
+scn_006_mid_sprint_scope_addition:
+  prd_v1: |
+    Payouts API, PRD v1. Six-week build of a new payouts API. Acceptance
+    criteria: ACH payouts complete within 1 business day; the API supports
+    500 RPS.
+  sprint_plan_week3: |
+    Sprint plan, week 3 of 6 (halfway through the build). Timeline unchanged
+    from the original six-week plan. Acceptance criteria unchanged from PRD v1.
+  leadership_change_request: |
+    Change request from leadership: add instant payouts via debit rails to
+    the same release. Attached: no revised timeline and no dependency analysis.
+
+scn_007_ledger_service_circular_dependency:
+  system_architecture_v2.1: |
+    Unified ledger service, architecture v2.1. The new ledger service depends
+    on the fraud service for transaction enrichment. Ledger team lists the
+    fraud service as a hard dependency for its Q2 release.
+  fraud_service_refactor_doc: |
+    Fraud service refactor, in progress in parallel with the ledger build.
+    After the refactor the fraud service depends on the new ledger service for
+    historical lookups. Fraud team lists the ledger service as a hard
+    dependency for its Q2 release.
+  q2_release_plan: |
+    Q2 release plan. Ledger service release: depends on the fraud service.
+    Fraud service release: depends on the ledger service. Both ship in Q2.
+
+scn_008_clean_idempotency_key_rollout:
+  design_doc_v2: |
+    Idempotency keys for the refunds endpoint, design v2. Scope is limited to
+    the refunds endpoint. Uses the existing key store, which has already
+    shipped. No new vendor dependencies. Acceptance criteria are measurable.
+  security_review_signoff: |
+    Security review for the refunds idempotency-key rollout: completed and
+    attached.
+  cost_estimate: |
+    Cost estimate for the refunds idempotency-key rollout: negligible cost
+    impact.
+
+scn_009_clean_observability_dashboard:
+  design_doc_v1: |
+    Observability dashboard for the existing settlement pipeline, design v1.
+    Read-only consumer of existing metrics. No new data collection. No PII
+    exposure. Acceptance criteria are clear and measurable.
+  metrics_inventory: |
+    Metrics inventory: the dashboard reads metrics the settlement pipeline
+    already emits. No new metrics or data sources are added.
+  license_quote: |
+    License quote: cost is fixed at the dashboard tool's per-seat license.
+
+scn_010_clean_db_index_addition:
+  design_doc_v1: |
+    Two composite indexes on the transactions table, design v1. Supports a
+    known slow query pattern. Rollout uses an online schema change tool. No
+    API changes. No security implications.
+  query_performance_analysis: |
+    Query performance analysis: the slow query pattern on the transactions
+    table is identified, and the two composite indexes target it. Index size
+    is estimated.
+  rollback_plan: |
+    Rollback plan for the index addition: documented.

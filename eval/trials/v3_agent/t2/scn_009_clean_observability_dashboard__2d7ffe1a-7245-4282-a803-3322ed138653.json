@@ -1,0 +1,266 @@
+{
+  "scenario_id": "scn_009_clean_observability_dashboard",
+  "run_id": "2d7ffe1a-7245-4282-a803-3322ed138653",
+  "started_at": "2026-11-18T21:30:57.524842Z",
+  "finished_at": "2026-11-18T21:31:19.040490Z",
+  "gate_results": [
+    {
+      "gate": "design_gate",
+      "agent_responses": [
+        {
+          "agent": "pm_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "The license quote references a per-seat cost but no total cost estimate or budget ceiling is documented at this gate. The number of seats, renewal cadence, and total annual spend are not specified. A concrete cost figure must be approved before proceeding to build.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "medium",
+              "concern_text": "Even for a fixed per-seat license, there is no documented ceiling on seat count expansion. As the ops team grows or additional teams are onboarded to the dashboard, uncapped seat additions could cause unplanned budget overruns. A maximum seat cap or approval gate for seat additions should be defined.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "The license quote names the dashboard tool but provides no SLA terms (uptime guarantee, support response times). For an observability dashboard on a settlement pipeline — a likely critical financial system — the absence of a vendor SLA is a gap that must be resolved before the tool is relied upon in production.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "low",
+              "concern_text": "The design doc does not describe a rollback procedure if the dashboard deployment fails or the tool becomes unavailable. Even for a read-only consumer, ops teams depend on this for incident response; a documented fallback (e.g., direct metric queries, prior tooling) should be specified.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": null,
+              "severity": "low",
+              "concern_text": "The metrics inventory confirms the dashboard reads only existing pipeline metrics, which is positive. However, it does not document what happens when new pipeline stages are added in the future. The acceptance criterion 'Covers 100% of pipeline stages currently emitting metrics' is scoped to the present state; a lightweight process for keeping the dashboard in sync with future pipeline changes should be noted to prevent silent coverage gaps.",
+              "references": [
+                "metrics_inventory",
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "The project is well-scoped and narrow: a read-only observability dashboard consuming existing settlement pipeline metrics with no new data collection. The three acceptance criteria are measurable and testable (3-second render time, 100% stage coverage, SSO access). There are no dependency cycles, no broad scope bundling, and no PII concerns raised. The main gaps are commercial and operational: the license quote lacks a total cost figure and seat ceiling, vendor SLA terms are absent, and no rollback or fallback plan is documented. These are all resolvable conditions and do not warrant a full block. The project can proceed once a concrete cost estimate with a seat cap is filed, vendor SLA terms are obtained, and a brief rollback/fallback procedure is added to the design doc."
+        },
+        {
+          "agent": "engineering_lead_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_no_circuit_breaker",
+              "severity": "medium",
+              "concern_text": "The design doc describes a read-only consumer of existing metrics endpoints but does not mention any circuit breaker, fallback, or degraded-mode behavior if the upstream metrics source becomes unavailable. If the pipeline metrics store or scrape endpoint is down, the dashboard will likely render as a blank/error state with no graceful degradation. A fallback (e.g., cached last-known-good data with a staleness banner) should be specified.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_no_timeout",
+              "severity": "medium",
+              "concern_text": "No timeout is configured or mentioned for synchronous queries from the dashboard to the metrics backend. Without an explicit timeout, a slow or hung upstream can hold connections open indefinitely, causing the 3-second render SLA to be silently violated and potentially exhausting connection pools.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_rollback_plan",
+              "severity": "medium",
+              "concern_text": "The design document does not describe a rollback procedure for the dashboard deployment. While this is read-only infrastructure, a bad release could break ops visibility into the settlement pipeline. A rollback plan (e.g., blue/green, versioned config, one-click revert) should be documented before deployment.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "The license quote references a per-seat dashboard tool but provides no SLA terms for that vendor (uptime, support response time, data availability guarantees). Given the settlement pipeline is presumably critical, an undocumented vendor SLA creates operational risk if the hosted dashboard tool experiences an outage.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "low",
+              "concern_text": "The license quote describes a per-seat model but does not cap the total number of seats or total spend. If seat count grows (e.g., onboarding additional ops teams), costs could escalate without a ceiling. A maximum-seat or cost-cap clause should be documented.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "low",
+              "concern_text": "The design does not mention audit logging for dashboard access. Settlement pipeline metrics may contain operationally sensitive throughput or financial-volume data. Access to the dashboard (especially authenticated SSO sessions) should emit access audit logs to satisfy potential compliance or incident-investigation requirements.",
+              "references": [
+                "design_doc_v1"
+              ]
+            }
+          ],
+          "reasoning": "Overall the design is scoped appropriately — a read-only observability layer consuming existing metrics with clear, measurable acceptance criteria and no new PII exposure or data collection. There are no blocking architectural defects. However, several medium-severity reliability and operational gaps need resolution before or shortly after deployment: (1) No circuit breaker or fallback mode is specified for upstream metrics unavailability, which risks a silent blank dashboard during incidents — exactly when ops needs it most. (2) No query timeout is defined, leaving the 3-second render SLA vulnerable to upstream slowness. (3) No rollback plan exists for the dashboard release itself. (4) The vendor SLA is absent from the license quote, creating an undocumented dependency on a third party for critical pipeline visibility. Two lower-severity items (cost ceiling and audit logging) are flagged as conditions. The gate decision is approve_with_conditions: the team must document timeouts, a circuit-breaker/fallback strategy, a rollback plan, and obtain the vendor SLA before the deployment gate."
+        },
+        {
+          "agent": "security_privacy_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_pci_scope_review",
+              "severity": "high",
+              "concern_text": "The project is an observability dashboard for a settlement pipeline, which almost certainly processes or proxies financial transaction data (and potentially card data). Despite this, there is no PCI scope assessment documented in the design or metrics inventory. Even a read-only consumer of settlement metrics can fall in-scope if the metrics surfaces or caches card numbers, PANs, or other cardholder data values.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            },
+            {
+              "defect_id": "def_no_audit_logging",
+              "severity": "medium",
+              "concern_text": "The design doc describes access to a settlement pipeline dashboard via SSO but contains no mention of audit logging for user access events (e.g., who queried which panel, when). For a financial-domain observability tool, access audit trails are typically required for SOX/PCI compliance.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_no_encryption_at_rest",
+              "severity": "medium",
+              "concern_text": "The design doc does not specify encryption-at-rest requirements for any caching layer, persisted query results, or snapshot storage the dashboard tool may use internally. If the dashboard caches or stores metric snapshots, those stores need documented encryption controls.",
+              "references": [
+                "design_doc_v1"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "The license quote for the dashboard tool references only per-seat pricing. No SLA terms (uptime guarantee, support tier, incident response) are documented for the third-party dashboard vendor, which is a dependency on the critical-path observability path for the settlement pipeline ops team.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_overbroad_iam",
+              "severity": "medium",
+              "concern_text": "The design states the dashboard will consume existing pipeline metrics but does not document the IAM/RBAC model for the dashboard service account. Without a least-privilege scope definition, there is a risk the service account receives overly broad read permissions across the metrics store or other data sources.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory"
+              ]
+            }
+          ],
+          "reasoning": "The design is concise and scoped to read-only consumption of existing settlement-pipeline metrics, which limits the attack surface. The acceptance criteria are measurable and SSO-gated access is a positive control. However, the financial domain creates material compliance exposure that is not addressed in the current design artifacts: (1) No PCI scoping assessment is present despite this being a settlement pipeline — even a read-only metrics dashboard can be PCI in-scope if any metric value contains or proxies cardholder data. (2) Audit logging of dashboard access is unspecified, which is a gap for SOX/PCI audit trails. (3) Encryption-at-rest for any internal caching/snapshot layer is undocumented. (4) The third-party dashboard vendor has no documented SLA, which is a risk for a financial ops tool. (5) The IAM/service-account permission model is not defined, creating potential for overbroad read access. None of these are fatal to the design, but the PCI scope gap warrants explicit assessment before proceeding. The recommendation is approve_with_conditions: the team should complete a PCI scope determination, document the IAM grant, confirm encryption-at-rest for any cached data, add audit log requirements, and obtain vendor SLA terms before moving to the build gate."
+        },
+        {
+          "agent": "finops_legal_agent",
+          "gate": "design_gate",
+          "decision": "approve_with_conditions",
+          "concerns": [
+            {
+              "defect_id": "def_missing_cost_estimate",
+              "severity": "medium",
+              "concern_text": "The license quote references a per-seat cost but no total cost estimate is documented at the gate. The number of seats, the annual/monthly spend, and any overage or tier-upgrade costs are not stated. A concrete cost figure must be approved before proceeding.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_cost_ceiling",
+              "severity": "medium",
+              "concern_text": "No maximum spend cap or seat ceiling is defined. If the ops team grows or access is expanded, seat count — and therefore cost — can grow unboundedly. A cap or approval threshold for seat additions should be established.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_missing_vendor_sla",
+              "severity": "medium",
+              "concern_text": "The license quote covers pricing only. No SLA terms (uptime guarantee, support tier, incident response time) for the dashboard tool vendor are referenced or attached. Given this is an observability tool for a settlement pipeline, vendor uptime commitments are operationally material.",
+              "references": [
+                "license_quote"
+              ]
+            },
+            {
+              "defect_id": "def_no_egress_cost_model",
+              "severity": "low",
+              "concern_text": "The design states the dashboard reads metrics already emitted by the settlement pipeline, but no egress or data-transfer cost model is provided. If the dashboard tool is SaaS and pulls metrics from a cloud-hosted pipeline, cross-region or cross-service egress charges may apply and should be modeled.",
+              "references": [
+                "design_doc_v1",
+                "metrics_inventory",
+                "license_quote"
+              ]
+            }
+          ],
+          "reasoning": "The design is clean from a data-privacy and regulatory standpoint: it is read-only, adds no new data collection, and the design doc explicitly notes no PII exposure. Acceptance criteria are stated as measurable. However, three FinOps/legal gaps require resolution before full approval. First, the license quote provides only a per-seat pricing structure without a total cost estimate or seat count, leaving the budget commitment undefined at this gate. Second, there is no spend ceiling or seat-count cap, creating unbounded cost exposure as the ops team scales. Third, no vendor SLA terms are attached — for a tool sitting on the critical observability path of a settlement pipeline, the absence of contractual uptime and support commitments is a legal and operational risk. A lower-severity note is also raised on egress costs: if this is a SaaS dashboard pulling metrics from a cloud environment, cross-region data transfer costs should be modeled even if expected to be small. The project may proceed once a fully costed estimate with seat ceiling is documented and vendor SLA terms are reviewed and accepted."
+        }
+      ],
+      "outcome": "approved_with_conditions"
+    }
+  ],
+  "final_outcome": "approved_with_conditions",
+  "usage": [
+    {
+      "prompt_tokens": 5638,
+      "completion_tokens": 813,
+      "latency_ms": 18430,
+      "cost_usd": 0.029109,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v1",
+        "metrics_inventory",
+        "license_quote"
+      ]
+    },
+    {
+      "prompt_tokens": 5634,
+      "completion_tokens": 988,
+      "latency_ms": 21470,
+      "cost_usd": 0.031722,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v1",
+        "metrics_inventory",
+        "license_quote"
+      ]
+    },
+    {
+      "prompt_tokens": 5638,
+      "completion_tokens": 945,
+      "latency_ms": 21008,
+      "cost_usd": 0.031089,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v1",
+        "metrics_inventory",
+        "license_quote"
+      ]
+    },
+    {
+      "prompt_tokens": 5632,
+      "completion_tokens": 759,
+      "latency_ms": 18563,
+      "cost_usd": 0.028281,
+      "model": "claude-sonnet-4-6",
+      "tool_calls": [
+        "design_doc_v1",
+        "metrics_inventory",
+        "license_quote"
+      ]
+    }
+  ],
+  "schema_failures": 0,
+  "schema_failure_causes": [],
+  "mode": "agent"
+}

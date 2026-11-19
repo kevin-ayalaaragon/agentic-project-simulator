@@ -169,6 +169,7 @@ class TokenUsage(BaseModel):
     latency_ms: int
     cost_usd: float
     model: str
+    tool_calls: list[str] = Field(default_factory=list, description="Artifact names read via read_artifact, in call order.")
 
 
 class GateResult(BaseModel):
@@ -201,8 +202,9 @@ class ScenarioRun(BaseModel):
     )
     schema_failure_causes: list[str] = Field(
         default_factory=list,
-        description="One entry per failed attempt: refusal, max_tokens, or validation.",
+        description="One entry per failed attempt: refusal, max_tokens, max_tool_turns, or validation.",
     )
+    mode: str = Field(default="v2", description="Runner mode: v2, control, or agent.")
 
 
 # --------------------------------------------------------------------------- #
