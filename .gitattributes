@@ -1,0 +1,6 @@
+# Stable bytes for hashed retrieval artifacts on Windows checkouts.
+rag/corpus/*.jsonl text eol=lf
+rag/corpus/*.json text eol=lf
+eval/retrieval/*.yaml text eol=lf
+eval/retrieval/*.json text eol=lf
+*.npy binary

@@ -1,0 +1,105 @@
+# L3 retrieval labels: 20 queries, each with the NIST SP 800-53 controls a security
+# reviewer should find. Labels are control IDs (OSCAL form); chunks of a split
+# control count once (eval/metrics/retrieval.py).
+#
+# Protocol: written before any retrieval was run against the corpus, from the
+# query text and control titles only. Pipeline queries are built by
+# rag.query.build_query from the scenario's project state and artifacts (the
+# security reviewer's view), not from seeded defects; the labeler had read the
+# answer key, which is disclosed here.
+#
+# v1 judgments: the project owner judged a blind pool of 426 candidates (top 10
+# controls from keyword, vector and hybrid search, plus the draft labels, sorted
+# by control ID so the source was hidden), ticking what a security reviewer would
+# open. Frozen: changes need a new label version, not an edit. A query with no
+# relevant controls (p04) has undefined recall and is excluded from scoring.
+version: 1
+status: frozen
+judged_by: project owner, blind pooled review (2026-11-24)
+
+queries:
+  # --- pipeline: the security reviewer's real query for a scenario ------------ #
+  - id: p01
+    group: pipeline
+    scenario: scn_001_pii_logging
+    relevant: [au-11, au-3.3, au-9, sc-28, si-12.1]
+  - id: p02
+    group: pipeline
+    scenario: scn_005_cross_border_data_residency
+    relevant: [pt-2, pt-5, sa-9.5]
+  - id: p03
+    group: pipeline
+    scenario: scn_003_synchronous_vendor_call_in_checkout
+    relevant: [cp-2, sa-9]
+  - id: p04
+    group: pipeline
+    scenario: scn_009_clean_observability_dashboard
+    relevant: []
+  - id: p05
+    group: pipeline
+    scenario: scn_004_unbounded_compute_for_reconciliation
+    relevant: [sc-6]
+
+  # --- exact: control IDs or official terms written in the query -------------- #
+  - id: e01
+    group: exact
+    text: AU-11 audit record retention
+    relevant: [au-11, au-11.1, si-12]
+  - id: e02
+    group: exact
+    text: SC-28 protection of information at rest
+    relevant: [cp-9.8, sc-28, sc-28.1]
+  - id: e03
+    group: exact
+    text: AC-2(1) automated system account management
+    relevant: [ac-2, ac-2.1]
+  - id: e04
+    group: exact
+    text: IA-2(1) multi-factor authentication to privileged accounts
+    relevant: [ia-2, ia-2.1, ia-2.6]
+  - id: e05
+    group: exact
+    text: SI-12 information management and retention
+    relevant: [si-12, si-12.3]
+
+  # --- paraphrase: plain-language need, little word overlap ------------------- #
+  - id: q01
+    group: paraphrase
+    text: how long should we keep logs of user and system activity
+    relevant: [au-11, si-12]
+  - id: q02
+    group: paraphrase
+    text: encrypt customer data stored in databases and backups
+    relevant: [cp-9, sc-28, sc-28.1, sc-28.3]
+  - id: q03
+    group: paraphrase
+    text: require a second factor when admins sign in
+    relevant: [ia-2.1, ia-2.6]
+  - id: q04
+    group: paraphrase
+    text: remove access promptly when an employee leaves the company
+    relevant: [ac-2, ac-2.3, ps-4]
+  - id: q05
+    group: paraphrase
+    text: keep card numbers and customer names out of debugging output
+    relevant: [au-3.3, si-12.1]
+  - id: q06
+    group: paraphrase
+    text: an outsourced provider stores our customer data in another country
+    relevant: [sa-9, sa-9.5, sa-9.8]
+  - id: q07
+    group: paraphrase
+    text: keep the service up when it is flooded with malicious traffic
+    relevant: [sc-5, sc-5.2, sc-5.3]
+  - id: q08
+    group: paraphrase
+    text: tell customers and regulators after personal data is exposed
+    relevant: [ir-6, ir-8.1]
+  - id: q09
+    group: paraphrase
+    text: encrypt traffic between our services over the network
+    relevant: [sc-8, sc-8.1]
+  - id: q10
+    group: paraphrase
+    text: give people only the permissions their job needs
+    relevant: [ac-3.7, ac-6, ac-6.7]

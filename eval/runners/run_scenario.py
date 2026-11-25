@@ -8,6 +8,9 @@ to catalog defect IDs; one retry, with each failed attempt recorded by cause.
 V1 results (JSON-in-prompt) remain in eval/runs/ for comparison.
 V3 modes (--mode): control puts eval/artifacts.yaml text in the prompt; agent gives
 only artifact names and a strict read_artifact tool, looping up to MAX_TOOL_TURNS.
+V4 mode rag: control plus the top RAG_K NIST SP 800-53 chunks retrieved for the role
+(security_privacy only; other roles run as control), with `references` narrowed to
+the IDs of the chunks shown.
 
 Usage:
     export ANTHROPIC_API_KEY=sk-ant-...
@@ -39,6 +42,7 @@ from pydantic import Field, ValidationError, create_model
 from dotenv import load_dotenv
 load_dotenv()
 
+from rag.query import build_query
 from core_engine.schemas import (
     AgentResponse,
     AgentRole,
@@ -65,6 +69,8 @@ OUTPUT_PRICE_PER_MTOK = 15.0
 DEFECT_CATALOG_PATH = Path(__file__).resolve().parents[2] / "eval" / "defect_catalog.yaml"
 ARTIFACTS_PATH = Path(__file__).resolve().parents[2] / "eval" / "artifacts.yaml"
 MAX_TOOL_TURNS = 6  # agent mode: tool-call rounds allowed per attempt
+RAG_ROLES = {AgentRole.SECURITY_PRIVACY}  # NIST 800-53 covers this role; others run as control
+RAG_K = 5  # retrieved chunks per role call
 
 
 # --- Personas (unchanged from the V1 baseline) ----------------------------- #
@@ -111,12 +117,20 @@ def load_artifacts(scenario_id: str) -> dict[str, str]:
     return data.get(scenario_id, {})
 
 
+def role_mode(agent: AgentRole, mode: str) -> str:
+    """The mode one role call runs in: rag applies only to RAG_ROLES, the rest run as control."""
+    if mode == "rag" and agent not in RAG_ROLES:
+        return "control"
+    return mode
+
+
 def build_user_prompt(
     scenario: Scenario,
     agent: AgentRole,
     catalog: list[dict],
     mode: str = "v2",
     artifacts: dict[str, str] | None = None,
+    chunks: list[dict] | None = None,
 ) -> str:
     catalog_lines = "\n".join(f"  - {d['id']}: {d['description']}" for d in catalog)
     project_dict = scenario.project_state.model_dump(mode="json")
@@ -127,9 +141,15 @@ PROJECT STATE:
 
 KNOWN DEFECT CATALOG (use these IDs if a concern matches one; otherwise set defect_id to null):
 {catalog_lines or "  (catalog empty)"}"""
-    if mode == "control":
+    if mode in ("control", "rag"):
         texts = "\n\n".join(f"### {name}\n{text.strip()}" for name, text in (artifacts or {}).items())
         prompt += f"\n\nARTIFACTS:\n{texts}"
+    if mode == "rag" and chunks:
+        refs = "\n\n".join(f"[{c['chunk_id']}] {c['title']}\n{c['body']}" for c in chunks)
+        prompt += (
+            "\n\nREFERENCE CONTROLS (NIST SP 800-53 Rev. 5, retrieved for this review). "
+            "When a concern rests on one of these controls, list its ID in that concern's references.\n\n" + refs
+        )
     elif mode == "agent":
         prompt += "\n\nArtifact contents are not included. Read any artifact you need with the read_artifact tool."
     return prompt
@@ -164,7 +184,9 @@ def run_tool(artifacts: dict[str, str], tool_input: dict) -> tuple[str, bool]:
 
 # --- Output schema --------------------------------------------------------- #
 
-def build_output_model(agent: AgentRole, gate: str, catalog: list[dict]) -> type[AgentResponse]:
+def build_output_model(
+    agent: AgentRole, gate: str, catalog: list[dict], reference_ids: list[str] | None = None
+) -> type[AgentResponse]:
     """Narrow AgentResponse so the decoding grammar admits only this agent, this gate,
     and catalog defect IDs.
 
@@ -173,11 +195,14 @@ def build_output_model(agent: AgentRole, gate: str, catalog: list[dict]) -> type
     in each concern, matching the declared order.
     """
     defect_ids = Enum("DefectId", {d["id"]: d["id"] for d in catalog}, type=str)
+    # In rag mode a concern can cite only chunks that were shown. An empty Enum is
+    # invalid, so calls with nothing retrieved keep the plain list.
+    ref_type = list[Enum("ChunkId", {i: i for i in reference_ids}, type=str)] if reference_ids else list[str]
     concern = create_model(
         "CatalogConcern",
         __base__=RaisedConcern,
         defect_id=(defect_ids | None, ...),
-        references=(list[str], ...),
+        references=(ref_type, ...),
     )
     return create_model(
         "CatalogAgentResponse",
@@ -197,6 +222,8 @@ def _lowercase_enums(data: dict) -> dict:
         for key in ("severity", "defect_id"):
             if isinstance(concern.get(key), str):
                 concern[key] = concern[key].lower()
+        if isinstance(concern.get("references"), list):
+            concern["references"] = [r.lower() if isinstance(r, str) else r for r in concern["references"]]
     return data
 
 
@@ -237,12 +264,20 @@ def call_agent(
     scenario: Scenario,
     catalog: list[dict],
     mode: str = "v2",
+    retriever=None,
 ) -> tuple[AgentResponse | None, TokenUsage, list[str]]:
     """Run one agent. Returns (response or None on hard failure, usage, failure causes)."""
+    mode = role_mode(agent, mode)
     system_prompt = AGENT_PERSONAS[agent]
     artifacts = load_artifacts(scenario.id) if mode != "v2" else {}
-    user_prompt = build_user_prompt(scenario, agent, catalog, mode, artifacts)
-    output_model = build_output_model(agent, scenario.project_state.stage.value, catalog)
+    chunks: list[dict] = []
+    if mode == "rag":
+        # The query sees only the role's view (project state + artifacts), never the Scenario.
+        chunks = retriever(build_query(scenario.project_state, artifacts, agent), RAG_K)
+    user_prompt = build_user_prompt(scenario, agent, catalog, mode, artifacts, chunks)
+    output_model = build_output_model(
+        agent, scenario.project_state.stage.value, catalog, [c["chunk_id"] for c in chunks]
+    )
     output_config = {"format": {"type": "json_schema", "schema": transform_schema(output_model)}}
     failure_causes: list[str] = []
     response: AgentResponse | None = None
@@ -277,6 +312,8 @@ def call_agent(
         cost_usd=round(cost, 6),
         model=MODEL,
         tool_calls=tool_calls,
+        mode=mode,
+        retrieved=[c["chunk_id"] for c in chunks],
     )
     return response, usage, failure_causes
 
@@ -300,6 +337,11 @@ def run_scenario(scenario_path: Path, output_dir: Path, mode: str = "v2") -> Sce
     catalog = load_defect_catalog()
 
     client = Anthropic()  # reads ANTHROPIC_API_KEY from env
+    retriever = None
+    if mode == "rag":
+        from rag.retriever import default_retriever
+
+        retriever = default_retriever()
 
     started_at = datetime.now(timezone.utc)
     responses: list[AgentResponse] = []
@@ -308,7 +350,7 @@ def run_scenario(scenario_path: Path, output_dir: Path, mode: str = "v2") -> Sce
 
     # Sectioning: the four role reviews are independent, so they run concurrently.
     with ThreadPoolExecutor(max_workers=len(AgentRole)) as pool:
-        results = list(pool.map(lambda a: (a, *call_agent(client, a, scenario, catalog, mode)), AgentRole))
+        results = list(pool.map(lambda a: (a, *call_agent(client, a, scenario, catalog, mode, retriever)), AgentRole))
 
     for agent, response, usage, causes in results:
         usages.append(usage)
@@ -358,9 +400,10 @@ def main() -> int:
     )
     parser.add_argument(
         "--mode",
-        choices=["v2", "control", "agent"],
+        choices=["v2", "control", "agent", "rag"],
         default="v2",
-        help="v2: project state only; control: artifact text in the prompt; agent: artifacts read through a tool",
+        help="v2: project state only; control: artifact text in the prompt; agent: artifacts read through a tool; "
+        "rag: control plus retrieved NIST controls for the security reviewer (needs PD_PG_DSN)",
     )
     args = parser.parse_args()
 

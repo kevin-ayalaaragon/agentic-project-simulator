@@ -19,3 +19,6 @@ Thumbs.db
 # Debugging scratch files
 scn_007_flags.txt
 docs/PHASE1_BUILD_NOTES.md
+
+# Retrieval: raw NIST catalog is fetched and hash-checked, not committed
+rag/corpus/raw/

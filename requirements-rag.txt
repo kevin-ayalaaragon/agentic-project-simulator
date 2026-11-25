@@ -1,0 +1,7 @@
+# Retrieval layer (L3). Core tests do not need these; see pytest.ini.
+# Pinned: query vectors must match the committed corpus vectors, so the embedding
+# stack does not float (rag.embed also checks the model file's hash).
+numpy==2.5.5
+psycopg[binary]==3.3.9
+pgvector==0.5.1
+fastembed==0.9.1

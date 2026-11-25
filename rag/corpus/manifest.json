@@ -1,0 +1,16 @@
+{
+  "chunks": 1086,
+  "controls": 1014,
+  "corpus_sha256": "080204339db8e4ef25e2a279f5b490af6a226959428bb279a7636dd8984cbdc9",
+  "embedding_dim": 384,
+  "embedding_model": "BAAI/bge-small-en-v1.5",
+  "embedding_onnx_repo": "Qdrant/bge-small-en-v1.5-onnx-Q",
+  "embedding_onnx_revision": "aa8f8b060edb00e03bfdd08813a2949946c8ba55",
+  "embedding_onnx_sha256": "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431",
+  "license": "CC0 1.0 (NIST OSCAL content)",
+  "max_words": 300,
+  "normalized": true,
+  "query_prefix": "Represent this sentence for searching relevant passages: ",
+  "source": "https://raw.githubusercontent.com/usnistgov/oscal-content/5006f18c8047643eaa70e35dd0d20a58bcc41856/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json",
+  "source_git_blob_sha1": "55eb9f2506cab43e051eeac6b48496246afcfd2c"
+}
