@@ -7,10 +7,11 @@ Uses a tiny fixture corpus with hand-set embeddings, so no model download is nee
 import json
 import os
 
-import numpy as np
 import pytest
 
 pytestmark = pytest.mark.pg
+# The default CI job installs no retrieval deps; skip the module instead of failing collection.
+np = pytest.importorskip("numpy")
 psycopg = pytest.importorskip("psycopg")
 
 from rag.fusion import rrf  # noqa: E402
