@@ -170,6 +170,8 @@ class TokenUsage(BaseModel):
     cost_usd: float
     model: str
     tool_calls: list[str] = Field(default_factory=list, description="Artifact names read via read_artifact, in call order.")
+    mode: str = Field(default="", description="Mode this call ran in; in rag runs, roles outside RAG_ROLES run as control.")
+    retrieved: list[str] = Field(default_factory=list, description="Chunk IDs shown to the agent in rag mode, in rank order.")
 
 
 class GateResult(BaseModel):
@@ -204,7 +206,7 @@ class ScenarioRun(BaseModel):
         default_factory=list,
         description="One entry per failed attempt: refusal, max_tokens, max_tool_turns, or validation.",
     )
-    mode: str = Field(default="v2", description="Runner mode: v2, control, or agent.")
+    mode: str = Field(default="v2", description="Runner mode: v2, control, agent, or rag.")
 
 
 # --------------------------------------------------------------------------- #
