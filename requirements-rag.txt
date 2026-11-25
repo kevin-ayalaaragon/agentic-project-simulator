@@ -1,0 +1,5 @@
+# Retrieval layer (L3). Core tests do not need these; see pytest.ini.
+numpy>=2.0
+psycopg[binary]>=3.2
+pgvector>=0.4
+fastembed>=0.7

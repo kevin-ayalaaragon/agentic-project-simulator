@@ -19,3 +19,28 @@ jobs:
           python-version: "3.13"
       - run: pip install anthropic pydantic pyyaml python-dotenv pytest
       - run: python -m pytest -q
+
+  retrieval:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pd
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PD_PG_DSN: postgresql://postgres:postgres@localhost:5432/pd
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install anthropic pydantic pyyaml python-dotenv pytest -r requirements-rag.txt
+      - run: python -m pytest -m pg -q
