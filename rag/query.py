@@ -2,7 +2,7 @@
 
 Takes ProjectState, artifact text and the role, never a Scenario: a Scenario also
 carries `description` and `seeded_defects`, and retrieval must not see the answer key.
-tests/test_rag_query.py enforces both the signature and the absence of seeded text.
+tests/test_retrieval_core.py enforces both the signature and the absence of seeded text.
 """
 
 from __future__ import annotations

@@ -13,9 +13,11 @@ Usage: python -m rag.embed   (downloads the model on first run)
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Protocol
 
@@ -29,6 +31,19 @@ QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 ONNX_REPO = "Qdrant/bge-small-en-v1.5-onnx-Q"
 ONNX_REVISION = "aa8f8b060edb00e03bfdd08813a2949946c8ba55"
 ONNX_SHA256 = "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431"  # model_optimized.onnx
+
+
+def verify_model_file(cache_dir: Path) -> None:
+    """Fail loudly if the ONNX file fastembed loaded is not the pinned one.
+
+    Query vectors must come from the same model as the committed corpus vectors;
+    a silently swapped model would degrade retrieval with no error.
+    """
+    path = cache_dir / f"models--{ONNX_REPO.replace('/', '--')}" / "snapshots" / ONNX_REVISION / "model_optimized.onnx"
+    if not path.exists():
+        raise RuntimeError(f"pinned embedding model revision {ONNX_REVISION} not found under {cache_dir}")
+    if hashlib.sha256(path.read_bytes()).hexdigest() != ONNX_SHA256:
+        raise RuntimeError(f"embedding model file hash mismatch at {path}; expected {ONNX_SHA256}")
 
 
 class Embedder(Protocol):
@@ -45,7 +60,9 @@ class FastEmbedBge:
     def __init__(self) -> None:
         from fastembed import TextEmbedding  # lazy: core tests never import it
 
-        self._model = TextEmbedding(MODEL, cache_dir=os.environ.get("FASTEMBED_CACHE_PATH"))
+        cache_dir = os.environ.get("FASTEMBED_CACHE_PATH") or str(Path(tempfile.gettempdir()) / "fastembed_cache")
+        self._model = TextEmbedding(MODEL, cache_dir=cache_dir)
+        verify_model_file(Path(cache_dir))
 
     def _embed(self, texts: list[str]) -> np.ndarray:
         # Small batches: full-length (~400-token) passages are memory-bound on CPU, and

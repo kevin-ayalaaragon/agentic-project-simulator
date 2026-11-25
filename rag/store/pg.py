@@ -14,6 +14,7 @@ the full-text parser splits them into unhelpful tokens.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Literal
@@ -70,7 +71,13 @@ def connect(dsn: str) -> psycopg.Connection:
 def load(conn: psycopg.Connection, chunks_path: Path, embeddings_path: Path, manifest_path: Path) -> bool:
     """Rebuild the table from committed artifacts. Returns False when it was already current."""
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    stamp = f"{manifest['corpus_sha256']}:{manifest['embedding_model']}"
+    # Stamp from the files' own bytes, not the manifest's claims, so edited chunks or
+    # rebuilt embeddings always trigger a reload.
+    stamp = ":".join(
+        [hashlib.sha256(chunks_path.read_bytes()).hexdigest(),
+         hashlib.sha256(embeddings_path.read_bytes()).hexdigest(),
+         manifest.get("embedding_model", "")]
+    )
     row = conn.execute("SELECT value FROM store_meta WHERE key = 'stamp'").fetchone()
     if row and row[0] == stamp:
         return False

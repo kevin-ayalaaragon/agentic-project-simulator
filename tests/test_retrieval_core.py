@@ -142,3 +142,16 @@ def test_unscorable_queries_drop_with_their_vectors():
     assert unscored == ["b"]
     with pytest.raises(ValueError):
         scorable(queries, vectors[:2])
+
+
+def test_embedding_model_file_must_match_the_pinned_hash(tmp_path):
+    pytest.importorskip("numpy")  # rag.embed needs it; the default CI job does not install it
+    from rag.embed import ONNX_REPO, ONNX_REVISION, verify_model_file
+
+    with pytest.raises(RuntimeError, match="not found"):
+        verify_model_file(tmp_path)
+    model = tmp_path / f"models--{ONNX_REPO.replace('/', '--')}" / "snapshots" / ONNX_REVISION / "model_optimized.onnx"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"not the pinned model")
+    with pytest.raises(RuntimeError, match="hash mismatch"):
+        verify_model_file(tmp_path)
