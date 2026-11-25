@@ -20,7 +20,7 @@ import numpy as np
 import yaml
 
 from core_engine.schemas import AgentRole, Scenario
-from eval.metrics.retrieval import score_queries
+from eval.metrics.retrieval import bootstrap_ci, score_queries
 from rag.query import build_query
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,6 +32,7 @@ QUERY_MANIFEST = HERE / "query_manifest.json"
 BASELINE = HERE / "baseline.json"
 ARMS = ("fts", "vector", "hybrid")
 K = 10
+METRICS = ("recall@5", "recall@10", "mrr")
 
 
 def load_queries() -> list[dict]:
@@ -70,6 +71,19 @@ def scorable(queries: list[dict], vectors: np.ndarray) -> tuple[list[dict], np.n
     return [queries[i] for i in kept], vectors[kept], unscored
 
 
+def summarize(per_query: dict[str, dict[str, float]], group_of: dict[str, str]) -> dict:
+    """Mean of each metric per query group and overall, plus 95% percentile-bootstrap intervals
+    (2,000 resamples, seed 0, each query its own resampling unit)."""
+    summary, intervals = {}, {}
+    for group in ["all", *sorted(set(group_of.values()))]:
+        ids = [i for i in per_query if group == "all" or group_of[i] == group]
+        summary[group] = {m: round(sum(per_query[i][m] for i in ids) / len(ids), 4) for m in METRICS}
+        intervals[group] = {
+            m: [round(x, 4) for x in bootstrap_ci({i: per_query[i][m] for i in ids}, seed=0)[1:]] for m in METRICS
+        }
+    return {"summary": summary, "intervals": intervals}
+
+
 def run(dsn: str, queries: list[dict], vectors: np.ndarray) -> dict:
     from rag.store import pg
 
@@ -82,11 +96,7 @@ def run(dsn: str, queries: list[dict], vectors: np.ndarray) -> dict:
     for arm in ARMS:
         ranked = {q["id"]: pg.search(conn, q["text"], v, arm=arm, k=K) for q, v in zip(queries, vectors)}
         per_query = score_queries(ranked, qrels)
-        summary = {}
-        for group in ["all", *groups]:
-            ids = [q["id"] for q in queries if group == "all" or q["group"] == group]
-            summary[group] = {m: round(sum(per_query[i][m] for i in ids) / len(ids), 4) for m in ("recall@5", "recall@10", "mrr")}
-        result["arms"][arm] = {"summary": summary, "per_query": per_query}
+        result["arms"][arm] = {"per_query": per_query, **summarize(per_query, {q["id"]: q["group"] for q in queries})}
     conn.close()
     return result
 
@@ -94,8 +104,19 @@ def run(dsn: str, queries: list[dict], vectors: np.ndarray) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--embed-queries", action="store_true", help="compute and save query vectors (downloads the model)")
+    parser.add_argument("--summarize", action="store_true", help="recompute means and intervals from baseline.json; no database")
     args = parser.parse_args()
     queries = load_queries()
+
+    if args.summarize:
+        baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+        group_of = {q["id"]: q["group"] for q in queries}
+        for arm in ARMS:
+            per_query = baseline["arms"][arm]["per_query"]
+            baseline["arms"][arm] = {"per_query": per_query, **summarize(per_query, group_of)}
+        BASELINE.write_text(json.dumps(baseline, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"summarized {BASELINE.name}")
+        return 0
 
     if args.embed_queries:
         from rag.embed import MODEL, QUERY_PREFIX, FastEmbedBge

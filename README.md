@@ -2,7 +2,7 @@
 
 A multi-agent simulator that runs proposed software projects through a gated lifecycle review (design, architecture, build, launch readiness) with role-scoped LLM stakeholders playing the four roles that typically gate-keep real engineering programs: a product manager, an engineering lead, a security/privacy reviewer, and a FinOps/legal reviewer. The simulator's purpose is twofold. As a system, it stress-tests project plans by surfacing the concerns a real cross-functional review would raise. As an evaluation target, it provides a structured environment for measuring how well a stochastic multi-agent system can detect known defects, stay in role, and stay grounded under varying prompt and grounding strategies.
 
-The repository includes the simulator itself, a fixed suite of 10 fintech/payments project scenarios with seeded defects, and a five-layer evaluation harness that produces master tables comparing V1 (baseline), V2 (structured outputs), and V3 (tool-calling agents vs. in-prompt context).
+The repository includes the simulator itself, a fixed suite of 10 fintech/payments project scenarios with seeded defects, and a five-layer evaluation harness that produces master tables comparing V1 (baseline), V2 (structured outputs), V3 (tool-calling agents vs. in-prompt context), and V4 (hybrid retrieval over NIST SP 800-53 in Postgres + pgvector, with a retrieval-augmented review mode).
 
 ## Baseline Results (V1)
 
@@ -62,11 +62,50 @@ V3 asks whether an agent harness with tool calling beats putting the same contex
 
 **Limits.** Recall is saturated, so this suite no longer separates the modes on recall; harder scenarios are the next step. Model-written artifacts that restate plainly worded descriptions make detection easier than real documents would. Gate-outcome accuracy is unchanged at 21/30 because the clean scenarios still draw approve-with-conditions votes.
 
+## V4 Results: Retrieval and RAG
+
+V4 builds the L3 retrieval layer and asks whether search over a real standards corpus finds what a security reviewer needs. The corpus is the full NIST SP 800-53 Rev. 5 catalog (public domain), fetched from a pinned commit and hash-checked: 1,014 active controls and enhancements, split into 1,086 chunks. One Postgres table serves both search arms: keyword search uses Postgres full-text search, and vector search uses pgvector cosine distance over `bge-small-en-v1.5` embeddings (the quantized ONNX build, 384 dimensions) with an exact scan, no approximate index. The hybrid arm fuses the top 50 from each with reciprocal rank fusion (k = 60) in a single SQL query. The labeled set is 20 queries: 5 that name a control, 10 that paraphrase a need in plain language, and 5 built from each scenario's security-reviewer view. The project owner judged relevance blind, from a pool of 426 candidates (the top 10 from every method plus the draft labels, sorted by control ID so the source was hidden), and the judgments are frozen as label v1. One scenario query had no relevant controls, so 19 are scored. Metrics are Recall@k and MRR at the control level (relevance is binary), with 95% percentile-bootstrap intervals (2,000 resamples, fixed seed); `python -m eval.retrieval.run_l3 --summarize` recomputes every number below from the per-query scores in `eval/retrieval/baseline.json`.
+
+| Metric (queries) | Keyword (full-text) | Vector (pgvector) | Hybrid (RRF) |
+|------------------|---------------------|-------------------|--------------|
+| Recall@5, paraphrase (10) | 0.12 [0.00, 0.28] | 0.33 [0.13, 0.53] | 0.19 [0.03, 0.40] |
+| Recall@10, paraphrase (10) | 0.26 [0.07, 0.47] | 0.52 [0.32, 0.72] | 0.38 [0.18, 0.57] |
+| MRR, paraphrase (10) | 0.12 [0.03, 0.23] | 0.35 [0.15, 0.58] | 0.31 [0.10, 0.56] |
+| Recall@5, scenario queries (4) | 0.08 [0.00, 0.25] | 0.00 | 0.12 [0.00, 0.38] |
+| Recall@5, control named in query (5) | 0.50 [0.33, 0.77] | 0.80 [0.67, 0.93] | 0.57 [0.37, 0.80] |
+| MRR, all scored queries (19) | 0.34 [0.16, 0.54] | 0.45 [0.25, 0.65] | 0.48 [0.27, 0.69] |
+
+**Vector search beat keyword search on paraphrased needs.** Recall@5 was 0.33 against 0.12, and Recall@10 0.52 against 0.26, on queries such as "require a second factor when admins sign in" that share few words with the control text. The intervals barely overlap at n = 10, so this is the clearest result in the table.
+
+**Fusion did not beat vector search at this size.** Hybrid's overall MRR (0.48) is within noise of vector search (0.45), and its recall trailed vector search on paraphrases, likely because reciprocal rank fusion gives equal weight to a keyword arm that misses most of them. Hybrid is not reported as the best method.
+
+**Scenario-derived queries failed for every method.** Recall@5 was at most 0.12 on the four scored scenario queries. Every one begins with the same generic security preamble from the query builder, which pulls all four toward the same controls. Dropping it is the planned v2 change; it was found after the label-blind baseline, so it will be reported as a second iteration rather than folded into these numbers.
+
+**Exact control IDs are a lookup, not retrieval quality.** Postgres's text parser splits "AU-11" into "au" and "-11", so control IDs written in a query are matched exactly before either search arm runs. That is why MRR is 1.00 on those five queries; recall stays below 1.00 because the owner also labeled related enhancements.
+
+**One Postgres store, not a separate vector database.** Postgres was already the only database in the author's projects, the CI service-container pattern already existed, and an exact scan doubles as the ground truth an approximate index would be measured against. This avoided two dependencies (Chroma and a BM25 library). An HNSW index is deferred until the corpus outgrows exact search.
+
+**`--mode rag` is built and tested offline; it has not run against the API yet.** It is control mode plus the top five retrieved controls for the security/privacy reviewer only, since NIST 800-53 barely covers the other roles, which run as control. Keeping the artifact text means a comparison with V3 control isolates the effect of retrieval. The retrieval query is built from the project state, artifacts, and role, never from the scenario record that holds the seeded defects; tests check the function signature and that no seeded-defect ID or description appears verbatim in any query. Each concern's `references` field is narrowed per call to an enum of the chunk IDs actually shown, so a citation cannot point at a control the agent never saw. Anthropic's Citations feature cannot be combined with structured outputs, which is why validity is enforced by the schema instead. Citation relevance (the share of cited controls labeled relevant) measures correctness. A 3 × 10 run costs about $3 and is held for approval.
+
+**Limits.** Samples of 10, 4, and 5 queries give wide, overlapping intervals (the four-query scenario row's intervals carry almost no information); read the table as direction, not proof. The keyword arm ranks with Postgres `ts_rank_cd`, which has no inverse-document-frequency term, so it is not BM25. The labeler had read the scenario answer key, which the label file discloses. The corpus is about 160k tokens and would fit in context, so the case for retrieval here is cost and selectivity rather than size: the full catalog would add roughly $0.48 of input to every role call, against a few cents for five chunks.
+
+### How V4 Was Delivered
+
+- **Success measures first.** Control-level Recall@k and MRR with intervals were fixed before retrieval was built. Draft labels were written before any search ran, then replaced by the owner's blind judgments and frozen as label v1; changing them requires a new label version.
+- **Plan checked against the code before building.** A review of the plan against the runner changed the scope: rag mode is limited to the one role the corpus covers, keeps the artifact text so the comparison with V3 isolates retrieval, and builds its query from inputs that cannot carry the answer key.
+- **Reuse over new infrastructure.** Postgres + pgvector replaced a planned Chroma store (see above), and the CI job reuses a Postgres service-container pattern already in use.
+- **Spend gated.** The only paid step, a 3 × 10 rag-mode run (about $3), waits for approval; the repo's rule is to ask before anything that calls the API. Everything else, including the regression gate, runs offline at no cost.
+- **Security review with triage.** No blocking findings. Applied: the embedding model file is hash-checked on load, retrieval dependencies are pinned, and the store reloads whenever the corpus or vector files change.
+- **Status stated as it is.** Unrun work is marked unrun, the null result on fusion is reported, and the scenario-query fix is listed as next rather than applied.
+
 ## Eval Integrity and Reproducibility
 
 - **Answer key protected.** Claude Code permission deny rules block the coding agent's edit tools from changing scenarios, the defect catalog, artifacts, human labels, and recorded runs, a guard against test tampering by coding agents.
 - **Regression gate.** A Stop hook keeps a Claude Code turn open while the offline tests fail. CI runs the same tests (output contract, tool loop, artifact-leak check) with read-only permissions and no secrets.
 - **Reproducible.** `python -m eval.compare_trials --baseline v2 --configs v2 v3_control v3_agent` recomputes every V2 and V3 number from the 150 runs in `eval/trials/`.
+- **Retrieval gate.** A separate CI job loads the committed corpus and vectors into a `pgvector/pgvector:pg16` service container, reruns all three search methods on the frozen labels, and fails if an overall score drops more than 0.01 below the committed baseline. The default test job stays database-free (`pg` marker in `pytest.ini`).
+- **Pinned inputs.** The NIST catalog is fetched from a fixed commit and checked against its git blob hash; the embedding model's revision and file hash are recorded and verified on load; corpus and query vectors are committed, so CI needs no model download and no network.
+- **Answer key kept out of retrieval.** The query builder accepts only what a role can see, and tests reject any query containing a seeded-defect ID or description.
 
 ## Architecture
 
@@ -77,11 +116,11 @@ The system has two layers: the simulator (which runs scenarios) and the evaluati
 | Structural Integrity | L1: Schema validity | Whether agent outputs conform to the Pydantic schema |
 | Behavioral Fidelity | L4: Persona fidelity | Whether agents stay in their assigned role |
 | Functional Accuracy & Unit Economics | L2: Defect detection | Precision and recall on seeded defects |
-| | L3: Retrieval quality | Recall@k, MRR on retrieved playbook chunks |
+| | L3: Retrieval quality | Recall@k, MRR on retrieved NIST SP 800-53 controls, against frozen owner-judged labels |
 | | L5: Groundedness | Rate of assertions traceable to project state or retrieved context |
 | | Cost | Dollars per full lifecycle simulation |
 
-Phase 1 (V1 baseline) implements L1, L2, and cost. The L4 persona judge shipped ahead of schedule with human-validated calibration. V2 changed how outputs are decoded and V3 tested tool-calling agents against in-prompt context (see V2 and V3 Results); L3 (retrieval) and L5 (groundedness) are not built yet.
+Phase 1 (V1 baseline) implements L1, L2, and cost. The L4 persona judge shipped ahead of schedule with human-validated calibration. V2 changed how outputs are decoded, V3 tested tool-calling agents against in-prompt context, and V4 built L3 (see V2 to V4 Results). L5 groundedness is not built; V4's citation rate and citation relevance are an offline stand-in until a calibrated grounding judge exists.
 
 ## Methodology
 
@@ -108,6 +147,7 @@ Status of the V1 failure modes after V2 and V3:
 - Done in V2: L1 retries fell from 4 across three V1 trials to 0 across three V2 trials (120 agent calls each) with grammar-constrained structured outputs (V2 Results).
 - Tagged recall matched true recall (1.00) in V3 once artifact text was available; the one-defect-per-concern constraint is still unbuilt and matters once harder scenarios move recall off the ceiling.
 - Strict precision rose from 0.10 to 0.11 in V1 and V2 to 0.21 to 0.24 in V3 once artifact text was available. The remaining lever is persona-prompt tightening now targeted by the measured drift asymmetry (PM at 0.55 and engineering lead at 0.63 in-persona are the weak prompts; their dominant leak directions are documented above).
+- Retrieval (V4): drop the shared preamble from scenario queries and report it as a second iteration on the same frozen labels; run the 3 × 10 rag-mode comparison against V3 control (about $3, needs approval); add an HNSW index only when the corpus outgrows exact search, measured against the exact-scan results.
 - A cross-cutting "release coordinator" agent for systemic concerns (dependency cycles, sequencing, multi-service coordination) is lower priority: the roles missed `scn_007` from project state alone (initial V2: 0 of 6), but caught it in 3 of 3 V3 trials once artifact text was available.
 
 ## Repository Layout
@@ -121,11 +161,17 @@ Status of the V1 failure modes after V2 and V3:
 │   ├── artifacts.yaml          # Artifact text for V3 (model-written from scenario descriptions)
 │   ├── scenarios/              # 10 YAML test fixtures
 │   ├── runners/
-│   │   └── run_scenario.py     # Runs one scenario; --mode v2, control, or agent
+│   │   └── run_scenario.py     # Runs one scenario; --mode v2, control, agent, or rag
 │   ├── metrics/
 │   │   ├── schema.py           # L1 scorer
 │   │   ├── defects.py          # L2 scorer
+│   │   ├── retrieval.py        # L3: control-level Recall@k, MRR, bootstrap intervals
+│   │   ├── citations.py        # Citation rate and relevance for rag runs
 │   │   └── persona.py          # L4 aggregator: in-persona rate, encroachment, flag partition
+│   ├── retrieval/
+│   │   ├── queries.yaml        # 20 labeled queries, owner-judged, frozen as label v1
+│   │   ├── run_l3.py           # Keyword vs vector vs hybrid; writes baseline.json
+│   │   └── baseline.json       # Committed L3 baseline and per-query scores
 │   ├── judges/
 │   │   ├── persona_judge.py    # L4 discrete-rubric judge
 │   │   └── judge_validation/   # 45 human-labeled turns + agreement scorer
@@ -135,7 +181,14 @@ Status of the V1 failure modes after V2 and V3:
 │   ├── report.py               # Aggregates L1 + L2 into the master table
 │   ├── compare_trials.py       # Recomputes the V2 and V3 Results tables from eval/trials/
 │   └── report.md               # Latest generated report
-├── tests/                      # Offline tests (output contract, tool loop, artifact leaks), run in CI
+├── rag/
+│   ├── corpus/                 # NIST catalog builder (pinned, hash-checked), chunks, embeddings, manifest
+│   ├── store/                  # Postgres + pgvector schema and hybrid search
+│   ├── embed.py                # bge-small embeddings via fastembed; model hash verified
+│   ├── query.py                # Retrieval query from the role's view only
+│   ├── fusion.py               # Reciprocal rank fusion reference
+│   └── retriever.py            # Runtime retriever for --mode rag
+├── tests/                      # Offline tests (output contract, tool loop, artifact leaks, retrieval); pg tests in CI
 ├── .github/workflows/ci.yml    # Runs the tests on push and pull request
 ├── .claude/settings.json       # Claude Code permission rules and Stop-hook test gate
 ├── CLAUDE.md                   # Commands and rules for Claude Code sessions
@@ -179,6 +232,17 @@ python -m eval.report --runs-dir eval/runs_v2 --out eval/report_v2.md
 python -m eval.compare_trials --baseline v2 --configs v2 v3_control v3_agent
 ```
 
+Retrieval (L3 and `--mode rag`). Install `pip install -r requirements-rag.txt` and point `PD_PG_DSN` at a throwaway Postgres with pgvector (loading creates and truncates a `chunks` table):
+
+```bash
+python -m pytest -m pg                       # store tests and the L3 regression gate
+python -m eval.retrieval.run_l3              # rerun keyword vs vector vs hybrid; writes baseline.json
+python -m eval.retrieval.run_l3 --summarize  # recompute means and intervals, no database
+python -m eval.runners.run_scenario eval/scenarios/scn_001_pii_logging.yaml --mode rag  # paid API call
+```
+
+Rebuilding the corpus or vectors downloads the NIST catalog and the embedding model once: `python -m rag.corpus.build`, `python -m rag.embed`, `python -m eval.retrieval.run_l3 --embed-queries`.
+
 Judge persona fidelity and validate the judge (L4):
 
 ```bash
@@ -187,3 +251,7 @@ python -m eval.judges.judge_validation.score_agreement
 ```
 
 The V1 table at the top of this README is produced by those commands. Each scenario costs approximately $0.08 on Claude Sonnet at the time of this baseline; the full suite is around $0.80. Judging all 301 concerns with an Opus-class judge cost approximately $5, so re-judging is cached per scenario and only re-runs with `--force`.
+
+## Related Project
+
+[ar-postcard-studio](https://github.com/kevin-ayalaaragon/ar-postcard-studio) runs on the same Postgres platform (Neon in production, a Postgres service container in CI); V4 reused that pattern instead of adding a vector database. It also carries this portfolio's API work: a read-only, admin-only GraphQL API with query cost limits, documented in its [ADR-0013](https://github.com/kevin-ayalaaragon/ar-postcard-studio/blob/main/docs/adr/0013-graphql-admin-api.md).

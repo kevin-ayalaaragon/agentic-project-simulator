@@ -4,8 +4,10 @@
 > - **Shipped:** L1 schema validity, L2 defect detection, cost telemetry, V1 baseline across 10 scenarios (see README for numbers).
 > - **Shipped ahead of schedule:** L4 persona judge with `encroaches_on` extension, validated against 45 hand-labeled turns (0.67 Cohen's kappa, all disagreements adjacent-category). Judge additionally partitions L2's unmatched flags into legitimate unseeded catches vs persona drift.
 > - **Shipped (V2):** grammar-constrained structured outputs narrowed to the defect catalog, parallel role calls, offline contract tests in CI, and a 3-trial V1/V2 comparison (see README V2 Results). V2 changed decoding, not retrieval.
-> - **Pending:** L3 retrieval (ChromaDB + playbooks), L5 groundedness, dataset expansion to 25 scenarios, a retrieval-grounded V2 column.
-> - **Deviations from plan:** 10 scenarios in V1 rather than 25 (deliberate Phase 1 scope cut); judge model is Opus-class rather than same-tier, which strengthens the judge but raises judging cost to ~$5 per full pass.
+> - **Shipped (V3):** tool-calling agents vs in-prompt artifact context, 3 trials per mode (see README V3 Results).
+> - **Shipped (V4):** L3 retrieval over the NIST SP 800-53 catalog in Postgres + pgvector (keyword, vector and hybrid), scored on 20 owner-judged labels with a CI regression gate; `--mode rag` built and tested offline (see README V4 Results).
+> - **Pending:** the first paid rag-mode run, L5 groundedness (a calibrated judge; V4 adds only citation rate and relevance), dataset expansion to 25 scenarios.
+> - **Deviations from plan:** 10 scenarios in V1 rather than 25 (deliberate Phase 1 scope cut); judge model is Opus-class rather than same-tier, which strengthens the judge but raises judging cost to ~$5 per full pass. L3 uses Postgres + pgvector instead of ChromaDB (reuses the only database already in use; exact scan doubles as ground truth) and the public NIST SP 800-53 catalog instead of hand-written playbooks; the labeled set has 20 queries (19 scored).
 
 ## Purpose
 

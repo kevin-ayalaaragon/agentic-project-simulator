@@ -155,3 +155,16 @@ def test_embedding_model_file_must_match_the_pinned_hash(tmp_path):
     model.write_bytes(b"not the pinned model")
     with pytest.raises(RuntimeError, match="hash mismatch"):
         verify_model_file(tmp_path)
+
+
+def test_summary_and_intervals_come_from_per_query_scores():
+    pytest.importorskip("numpy")  # run_l3 imports it; the default CI job does not install it
+    from eval.retrieval.run_l3 import summarize
+
+    per_query = {"a": {"recall@5": 1.0, "recall@10": 1.0, "mrr": 1.0},
+                 "b": {"recall@5": 0.0, "recall@10": 0.5, "mrr": 0.5}}
+    out = summarize(per_query, {"a": "x", "b": "y"})
+    assert out["summary"]["all"]["recall@5"] == 0.5 and out["summary"]["x"]["mrr"] == 1.0
+    low, high = out["intervals"]["all"]["recall@5"]
+    assert 0.0 <= low <= 0.5 <= high <= 1.0
+    assert out == summarize(per_query, {"a": "x", "b": "y"})  # seeded
